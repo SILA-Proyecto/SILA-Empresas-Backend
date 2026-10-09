@@ -1,0 +1,188 @@
+SILA - TEMAS CLAVE PARA LA PRESENTACION
+(Sistema de gestion de Llanolat: lacteos, ventas, cartera, inventario)
+Actualizado: 2026-10-09
+=====================================================================
+
+1. QUE ES SILA (la idea en 30 segundos)
+---------------------------------------
+Un sistema para controlar toda la operacion de una empresa de lacteos:
+compra de leche, produccion, inventario, ventas, cartera (lo que nos deben),
+facturacion y finanzas por quincena. Tiene 3 piezas:
+
+  - Base de datos: Oracle XE 21c (en Docker), PDB "XEPDB1", esquema LLANOLAT.
+  - Backend (API): Java 25 + Spring Boot 4.1.1 + JDBC (driver ojdbc17).
+  - Dashboard (pantallas): Angular 22 + Tailwind 4 + ApexCharts.
+
+  Flujo: Navegador (Angular :4200) -> API REST JSON (Spring :8080) -> Oracle.
+
+
+2. ARQUITECTURA (como esta organizado)
+--------------------------------------
+- La LOGICA DE NEGOCIO vive en la base de datos, en PACKAGES de PL/SQL
+  (14 packages, ej. pkg_ventas, pkg_cartera, pkg_acopio, pkg_produccion).
+  El backend solo valida, autentica y llama a esos procedimientos.
+  Ventaja: las reglas (cupo de credito, stock, periodo cerrado) se cumplen
+  aunque alguien entre por otra puerta.
+- La aplicacion NO puede leer tablas directamente: solo EJECUTA packages y
+  CONSULTA VISTAS (21 vistas). Si intenta leer una tabla -> ORA-00942.
+  Esto esta probado.
+- Dos cuentas de base de datos: el dueno del esquema (DDL, entra por "proxy",
+  sin clave propia) y LLANOLAT_APP (la que usa el backend, con minimos permisos).
+- Capas del backend por modulo: controller -> service -> repository -> dto.
+  Paquetes: catalogos, periodos, acopio, produccion, ventas, cartera,
+  parametros, seguridad, consultas, infra.
+- SilaTemplate (infra): usa UNA conexion por operacion. Antes de llamar el
+  procedimiento fija en la sesion de Oracle quien es el usuario y su rol
+  (contexto CTX_SILA). La base verifica el rol por si misma.
+- API REST bajo /api/v1, JSON en snake_case, paginacion estandar Page<T>
+  (page, size, sort con lista blanca), errores uniformes {code, message,
+  support_ref}.
+- Contrato backend <-> dashboard documentado en CONTRATO_BACKEND.md.
+
+
+3. LOGIN Y SEGURIDAD (el tema fuerte)
+-------------------------------------
+Flujo de inicio de sesion por pasos:
+
+  usuario + clave
+      -> (si la clave es temporal) CAMBIAR_CLAVE
+      -> MFA_ENROLAR (primera vez: escanear QR) o MFA_REQUERIDO (ingresar codigo)
+      -> OK: token de acceso + cookie de renovacion
+
+- Cada paso intermedio entrega un TOKEN TEMPORAL de un solo proposito (claim
+  "tipo"); no abre el resto del API. Solo el ultimo paso da acceso.
+- Autenticacion: Spring Security sin estado + JWT firmado HS256 (access token,
+  vida corta). Token de renovacion (refresh) en cookie httpOnly + SameSite=Strict
+  + Secure en produccion; se ROTA en cada uso y se detecta su reuso (si alguien
+  lo roba y lo reusa, se revoca toda la sesion).
+- Claves: hash BCrypt. Politica: minimo 12 caracteres, distinta de la actual,
+  sin el usuario ni palabras obvias. Los mensajes de error no distinguen
+  "usuario no existe" de "clave mala" (evita enumerar usuarios).
+- Segundo factor (MFA): TOTP RFC 6238 (apps tipo Google Authenticator),
+  verificado con los vectores de prueba del RFC. El secreto se guarda cifrado
+  (AES-GCM). Anti-replay: un codigo sirve una sola vez.
+- Codigos de respaldo: 10 de un solo uso (solo se guarda su SHA-256) para
+  entrar si se pierde el telefono.
+- Bloqueo: 5 intentos fallidos -> cuenta bloqueada 15 min. Ademas limite de
+  frecuencia por IP/usuario (responde 429).
+- Acciones sensibles piden el codigo MFA OTRA VEZ con la sesion abierta:
+  cambiar clave, regenerar codigos de respaldo y editar mis datos.
+- Sesiones: el token lleva el id de sesion (sid). Cerrar una sesion, cambiar
+  la clave, desactivar al usuario o cambiarle el rol corta el acceso en
+  segundos. El usuario puede ver sus dispositivos y cerrar las otras.
+- Bitacora de accesos (eventos_acceso, solo insercion): cada login, fallo,
+  bloqueo, logout, con IP y navegador. Pantalla de auditoria solo para ADMIN.
+- Roles: ADMIN (todo, incluye usuarios, anulaciones, castigos, parametros,
+  precios pactados, cierre de periodos) y OPERATIVO (operacion diaria).
+  El rol se exige en DOS sitios: la cadena de Spring Security y el package
+  en Oracle.
+- Idempotency-Key: obligatoria en ventas, cartera y facturacion. Un reintento
+  (doble clic, red caida) NO duplica la venta. Guarda respuestas 2xx 24 h
+  por usuario.
+- Otros: CORS solo para :4200, backend solo en 127.0.0.1, actuator/health
+  sin detalles, manejador general de errores (nunca devuelve trazas), perfil
+  "prod" con logs INFO, cookie Secure y limites de tamano.
+- Dependencias vigiladas con consulta a OSV (pruebas/dependencias.py): se
+  fijaron versiones seguras de Tomcat y Jackson.
+- Pruebas: 32 unitarias (./mvnw test) y ~170 comprobaciones de integracion
+  contra Oracle (pruebas/seguridad.py), incluida una matriz endpoint x rol.
+
+
+4. FLUJO DEL NEGOCIO (de punta a punta)
+----------------------------------------
+  Proveedor lechero --> ACOPIO (recepcion de leche, control de calidad)
+        --> PRODUCCION (lote: consume litros, suma stock de producto)
+        --> INVENTARIO (stock, ajustes, alertas de caducidad)
+        --> VENTAS (contado o credito; el servidor calcula precio, IVA, total)
+        --> CARTERA (deuda del cliente, abonos, castigos)
+        --> FACTURACION (factura electronica y notas credito)
+        --> FINANZAS por QUINCENA (ingresos - costos - gastos = resultado)
+
+- PERIODOS: el ano se divide en 24 quincenas. Cerrar una quincena bloquea
+  movimientos en ella (solo ADMIN puede cerrar/reabrir, con motivo).
+- Todo cambio importante queda en auditoria_cambios (inmutable: triggers
+  impiden borrar o modificar).
+- Fechas en hora de Colombia (la base trabaja en UTC).
+
+
+5. FUNCIONES YA CONSTRUIDAS (backend)
+--------------------------------------
+- Catalogos: clientes, proveedores, productos (crear, editar, activar/
+  desactivar; nada se borra, se desactiva).
+- Periodos: listar, ver el actual, crear ano, cerrar/reabrir.
+- Acopio: recepcion de leche con calidad automatica (APROBADO/RECHAZADO por
+  umbrales de temperatura y acidez en parametros).
+- Produccion: lotes (suman stock), ajustes de inventario (ADMIN para sumar
+  o corregir), inventario, resumen y alertas de caducidad.
+- Ventas: venta con lineas, contado con VARIOS medios de pago o credito
+  dentro del cupo, anulacion (ADMIN), punto de venta con precios.
+- Precios pactados por cliente (ADMIN).
+- Cartera: clientes con deuda, abonos con reparto FIFO (la deuda mas vieja
+  primero), recibos, castigos (ADMIN).
+- Parametros del sistema editables (ADMIN) con rango y auditoria.
+- Usuarios (ADMIN): crear, editar, activar/desactivar, desbloquear,
+  restablecer clave y MFA, cerrar sesiones. Mi cuenta: editar mis datos,
+  cambiar clave, codigos de respaldo, mis sesiones.
+- Auditoria (ADMIN): accesos, cambios y errores.
+
+Reglas tecnicas destacadas:
+- Venta: bloqueo de filas ordenado (FOR UPDATE) para evitar choques entre
+  dos ventas simultaneas del mismo producto; se corrigieron 3 errores del
+  diseno original (ORA-01786 x2 y PLS-00204) al compilar contra Oracle real.
+- Inventario negativo imposible (restriccion + validacion).
+
+
+6. DASHBOARD (estado)
+---------------------
+- Angular 22 (componentes standalone), Tailwind 4, ApexCharts.
+- Patron repositorio con cambio mock/HTTP por fileReplacements; ApiService,
+  interceptores (token, errores con codigos ORA), kit de 13 componentes UI.
+- Construido: Login (por pasos, MFA), Catalogos, Mi cuenta, Usuarios,
+  y las pantallas de los modulos que se han ido entregando por prompt.
+- Pendiente: varias pantallas (ver seccion 7) y pruebas del dashboard.
+
+
+7. LO QUE FALTA
+---------------
+Funcional:
+- FACTURACION completa: falta la resolucion DIAN real (sin ella la emision
+  rechaza todo) y decidir si se factura con proveedor tecnologico.
+- GASTOS operativos (modulo de escritura y pantalla) y DOCUMENTOS
+  (repositorio de archivos).
+- CUENTAS POR PAGAR a proveedores: hoy NO existe el precio de compra de la
+  leche por proveedor ni cuanto se les debe. Plan: precio pactado por
+  proveedor con vigencia, valor fijo en cada recepcion (las rechazadas no
+  suman), pagos a proveedores y saldo por proveedor/quincena. Compra de
+  insumos tambien por registrar.
+- TABLERO (indicadores y graficas) con datos reales.
+- Inventario por LOTE (FEFO): hoy es por producto, y las alertas de
+  caducidad no reflejan existencias reales del lote (lacteos duran ~21 dias).
+- IVA por producto: confirmar con contabilidad.
+
+Seguridad antes de produccion:
+- HTTPS / proxy inverso, rotar claves que estan en archivos de trabajo,
+  desactivar cuentas prueba.*, politica de retencion/purga de bitacoras,
+  CSP e inactividad en el dashboard, respaldos de Oracle.
+
+Calidad:
+- Pruebas automatizadas del dashboard (hoy casi ninguna).
+
+
+8. FRASES CLAVE PARA DEFENDER EL DISENO
+----------------------------------------
+- "Las reglas de negocio estan en la base de datos, no solo en la app."
+- "La aplicacion no puede leer tablas, solo ejecutar procedimientos y ver
+  vistas."
+- "Login en tres capas: clave + segundo factor + sesion revocable al instante."
+- "Nada se borra: se desactiva y todo cambio queda auditado e inmutable."
+- "Un doble clic nunca duplica una venta (Idempotency-Key)."
+- "Probamos el sistema contra Oracle real, y asi encontramos y corregimos
+  3 errores del diseno original."
+
+=====================================================================
+Glosario rapido: JWT = token firmado de acceso | TOTP = codigo de 6 digitos
+que cambia cada 30 s | MFA = segundo factor | BCrypt = hash de claves |
+PL/SQL package = conjunto de procedimientos en Oracle | FIFO = primero en
+entrar, primero en pagarse | FEFO = primero en vencer, primero en salir |
+DIAN = autoridad de impuestos de Colombia | Idempotencia = repetir una
+peticion no repite el efecto.

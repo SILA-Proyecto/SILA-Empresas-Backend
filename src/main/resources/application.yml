@@ -1,0 +1,63 @@
+spring:
+  application:
+    name: sila
+
+  jackson:
+    # El contrato del dashboard usa los nombres de columna de la base (snake_case).
+    property-naming-strategy: SNAKE_CASE
+
+  datasource:
+    url: jdbc:oracle:thin:@localhost:1521/XEPDB1
+    username: LLANOLAT_APP
+    password: ${LLANOLAT_APP_PWD}
+    driver-class-name: oracle.jdbc.OracleDriver
+    hikari:
+      # LLANOLAT_APP no es dueno de nada: esto solo resuelve los nombres de
+      # los packages y vistas. No otorga ningun privilegio.
+      connection-init-sql: ALTER SESSION SET CURRENT_SCHEMA = LLANOLAT
+      # Los procedimientos PL/SQL hacen su propio COMMIT: no usar @Transactional.
+      auto-commit: true
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 10000
+      pool-name: sila-pool
+
+server:
+  # Solo esta maquina por defecto. Para probar desde otro equipo: SILA_BIND=0.0.0.0 (y nunca en produccion sin proxy y firewall).
+  address: ${SILA_BIND:127.0.0.1}
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never   # el detalle de la base no debe verlo cualquiera
+
+logging:
+  level:
+    com.llanolat.sila: DEBUG
+
+sila:
+  seguridad:
+    # jwt        = identidad del token de acceso. ES EL MODO POR DEFECTO, tambien en desarrollo.
+    # desarrollo = la identidad viene de las cabeceras X-Usuario / X-Rol: CUALQUIERA puede
+    #              ser ADMIN. Solo por excepcion explicita (SILA_MODO=desarrollo); el arranque
+    #              se niega a usarlo con un perfil de produccion.
+    modo: ${SILA_MODO:jwt}
+    usuario-por-defecto: dev.local
+    rol-por-defecto: OPERATIVO
+    # Claves en base64, por variable de entorno (./arrancar.sh las carga de credenciales.txt).
+    jwt-secret: ${SILA_JWT_SECRET:}
+    mfa-key: ${SILA_MFA_KEY:}
+    acceso-ttl: 15m
+    temporal-ttl: 5m
+    refresh-ttl: 12h
+    # La cookie de renovacion solo viaja por HTTPS. Chrome y Firefox la aceptan en http://localhost.
+    cookie-secure: ${SILA_COOKIE_SECURE:true}
+    mfa-obligatorio-roles: ADMIN
+  cors:
+    # Origenes permitidos (separados por coma). ng serve usa :4200.
+    origenes: http://localhost:4200

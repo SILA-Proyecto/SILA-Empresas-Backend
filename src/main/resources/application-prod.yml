@@ -1,0 +1,37 @@
+# Perfil de PRODUCCION: java -jar sila.jar --spring.profiles.active=prod
+# Se suma a application.yml y lo sobrescribe. El arranque se niega a funcionar si aqui (o en
+# cualquier lado) el modo de seguridad no es 'jwt'.
+sila:
+  seguridad:
+    modo: jwt
+    cookie-secure: true          # la cookie de renovacion solo viaja por HTTPS (el proxy termina TLS)
+
+server:
+  address: 127.0.0.1             # solo el proxy inverso local llega al backend
+  forward-headers-strategy: native   # confiar en X-Forwarded-* solo del proxy local
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+    include-exception: false
+  tomcat:
+    max-http-form-post-size: 64KB
+    connection-timeout: 10s
+    keep-alive-timeout: 20s
+
+management:
+  server:
+    address: 127.0.0.1           # actuator en un puerto aparte, solo local
+    port: 8081
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    root: INFO
+    com.llanolat.sila: INFO      # sin DEBUG: no registrar detalle de usuarios ni de consultas
