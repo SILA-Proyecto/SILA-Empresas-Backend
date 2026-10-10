@@ -5,6 +5,7 @@ import java.sql.CallableStatement;
 import java.sql.Types;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -27,7 +28,11 @@ public class VerificadorUsuario {
     private record Estado(boolean activo, String rol, boolean sesionAbierta, long expira) {}
 
     private final SilaTemplate sila;
+    private static final long INTERVALO_LIMPIEZA = 60_000_000_000L;
+    private static final int UMBRAL_LIMPIEZA = 1_000;
+
     private final Map<String, Estado> cache = new ConcurrentHashMap<>();
+    private final AtomicLong ultimaLimpieza = new AtomicLong(System.nanoTime());
 
     public VerificadorUsuario(SilaTemplate sila) { this.sila = sila; }
 
@@ -47,11 +52,22 @@ public class VerificadorUsuario {
                 return false;
             }
             cache.put(clave, e);
+            limpiarVencidas(ahora);
         }
         return e.activo() && e.sesionAbierta() && e.rol() != null && e.rol().equals(rolDelToken);
     }
 
-    /** Llamar tras desactivar, activar, cambiar el rol o cerrar sesiones de alguien: afecta a todas sus sesiones. */
+    /** Quita las entradas vencidas (una sesion que ya no vuelve no debe quedar para siempre en memoria). */
+    private void limpiarVencidas(long ahora) {
+        long previo = ultimaLimpieza.get();
+        if (cache.size() < UMBRAL_LIMPIEZA || ahora - previo < INTERVALO_LIMPIEZA
+                || !ultimaLimpieza.compareAndSet(previo, ahora)) {
+            return;
+        }
+        cache.values().removeIf(v -> v.expira() < ahora);
+    }
+
+    /** Llamar tras desactivar, activar, cambiar el rol, restablecer la clave o el MFA, o cerrar sesiones de alguien: afecta a todas sus sesiones. */
     public void invalidar(long idUsuario) {
         String prefijo = idUsuario + ":";
         cache.keySet().removeIf(k -> k.startsWith(prefijo));

@@ -65,6 +65,7 @@ class UsuarioService {
         obtener(id);
         String temporal = passwords.generarTemporal();
         repo.restablecerClave(id, passwords.hash(temporal));
+        verificador.invalidar(id);
         return new UsuarioConClaveTemporal(obtener(id), temporal);
     }
 
@@ -83,6 +84,7 @@ class UsuarioService {
     UsuarioDto restablecerMfa(long id) {
         obtener(id);
         repo.restablecerMfa(id);
+        verificador.invalidar(id);
         return obtener(id);
     }
 }

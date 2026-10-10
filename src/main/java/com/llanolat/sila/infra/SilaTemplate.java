@@ -60,7 +60,9 @@ public class SilaTemplate {
             try {
                 return operacion.ejecutar(c);
             } finally {
-                cerrarSesion(c);
+                if (!cerrarSesion(c)) {
+                    descartar(c);
+                }
             }
         } catch (SQLException e) {
             SilaException se = SilaException.de(e);
@@ -106,14 +108,25 @@ public class SilaTemplate {
         }
     }
 
-    private void cerrarSesion(Connection c) {
+    /** @return true si el contexto quedo limpio. */
+    private boolean cerrarSesion(Connection c) {
         try (CallableStatement s = c.prepareCall("{call pkg_seguridad.sp_cerrar_sesion}")) {
             s.execute();
+            return true;
         } catch (SQLException e) {
-            // No enmascarar el error original de la operacion, pero si avisar:
-            // una conexion que vuelve al pool con contexto es una fuga de identidad.
-            log.error("No se pudo cerrar la sesion de aplicacion; la conexion vuelve al pool "
-                    + "con el contexto puesto", e);
+            // No enmascarar el error original de la operacion.
+            log.error("No se pudo cerrar la sesion de aplicacion; se descarta la conexion para que "
+                    + "no vuelva al pool con la identidad puesta", e);
+            return false;
+        }
+    }
+
+    /** Aborta la conexion fisica: el pool la expulsa en vez de reutilizarla con el contexto sucio. */
+    private void descartar(Connection c) {
+        try {
+            c.abort(Runnable::run);
+        } catch (SQLException | RuntimeException e) {
+            log.error("No se pudo abortar la conexion con contexto sucio.", e);
         }
     }
 }

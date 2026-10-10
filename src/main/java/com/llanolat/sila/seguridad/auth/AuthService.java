@@ -46,7 +46,7 @@ import org.springframework.stereotype.Service;
 @Service
 class AuthService {
 
-    private static final String MSG_CREDENCIALES = "Usuario o clave incorrectos.";
+    private static final String MSG_CREDENCIALES = "Usuario o clave incorrectos. Si el problema continua, contacte al administrador.";
     private static final String MSG_SESION = "Sesion no valida. Inicie sesion de nuevo.";
     private static final Duration UN_MINUTO = Duration.ofMinutes(1);
     /** 32 simbolos sin O, I, 0, 1: 5 bits cada uno; 10 simbolos = 50 bits por codigo de respaldo. */
@@ -99,12 +99,16 @@ class AuthService {
             throw SilaException.de(SilaException.AUTENTICACION, MSG_CREDENCIALES);
         }
         if (cred.bloqueado()) {
+            // Responde igual que una clave mala (mismo mensaje y mismo tiempo): si el login distinguiera
+            // la cuenta bloqueada, un script podria sacar la lista de usuarios existentes.
+            passwords.gastarTiempo(clave);
             acceso.registrar(usuario, "CUENTA_BLOQUEADA", ip, userAgent, "intento durante el bloqueo");
-            throw bloqueada(cred.bloqueadoMin());
+            throw SilaException.de(SilaException.AUTENTICACION, MSG_CREDENCIALES);
         }
         if (!passwords.coincide(clave, cred.hash()) || !cred.activo()) {
             // Una cuenta desactivada responde igual que una clave mala, y tambien cuenta como fallo.
-            fallo(usuario, "CLAVE", ip, userAgent, cred.activo() ? null : "cuenta desactivada");
+            // Aunque este fallo bloquee la cuenta, aqui no se avisa: se responde lo mismo que siempre.
+            registrarFallo(usuario, "CLAVE", ip, userAgent, cred.activo() ? null : "cuenta desactivada");
             throw SilaException.de(SilaException.AUTENTICACION, MSG_CREDENCIALES);
         }
         return siguientePaso(cred, ip, userAgent);
@@ -127,7 +131,7 @@ class AuthService {
             fallo(cred.usuario(), "MFA", ip, userAgent, "codigo reutilizado");
             throw SilaException.de(SilaException.AUTENTICACION, "Ese codigo ya fue usado. Espere el siguiente.");
         }
-        return completar(cred, ip, userAgent);
+        return completarSiAlDia(cred, ip, userAgent);
     }
 
     /** Entrar con un codigo de respaldo (se perdio el telefono). Cada codigo sirve una sola vez. */
@@ -150,7 +154,7 @@ class AuthService {
             throw SilaException.de(SilaException.AUTENTICACION, "Codigo de respaldo incorrecto o ya usado.");
         }
         acceso.registrar(cred.usuario(), "CODIGO_RESPALDO_USADO", ip, userAgent, "restantes=" + consumo.restantes());
-        Resultado r = completar(cred, ip, userAgent);
+        Resultado r = completarSiAlDia(cred, ip, userAgent);
         return new Resultado(r.cuerpo().con(null, consumo.restantes()), r.refreshToken());
     }
 
@@ -179,7 +183,7 @@ class AuthService {
         acceso.registrar(cred.usuario(), "MFA_ACTIVADO", ip, userAgent, null);
         List<String> codigos = generarCodigosRespaldo(cred.idUsuario());
         if (Tipo.MFA_ENROLAR.claim().equals(jwt.getClaimAsString("tipo"))) {
-            Resultado r = completar(cred, ip, userAgent);
+            Resultado r = completarSiAlDia(cred, ip, userAgent);
             return new Resultado(r.cuerpo().con(codigos, null), r.refreshToken());
         }
         return new Resultado(AuthResponse.estado("MFA_ACTIVADO").con(codigos, null), null);
@@ -339,6 +343,17 @@ class AuthService {
         return new Resultado(new AuthResponse(estado, null, null, token, null, null, null), null);
     }
 
+    /**
+     * Un token temporal de MFA puede haberse emitido antes de que un administrador restableciera la
+     * clave: si la cuenta debe cambiarla ahora, no se entra; se pide el cambio.
+     */
+    private Resultado completarSiAlDia(Credencial cred, String ip, String userAgent) {
+        if (cred.debeCambiar()) {
+            return temporal(Tipo.CAMBIAR_CLAVE, "CAMBIAR_CLAVE", cred);
+        }
+        return completar(cred, ip, userAgent);
+    }
+
     /** Ultimo paso: registra el login, abre la sesion (familia de renovacion) y emite el acceso. */
     private Resultado completar(Credencial cred, String ip, String userAgent) {
         repo.loginOk(cred.idUsuario());
@@ -431,15 +446,23 @@ class AuthService {
         }
     }
 
-    /** Registra un fallo; si con este se bloquea la cuenta, lo informa en vez de un 401 comun. */
+    /** Registra un fallo; si con este se bloquea la cuenta, lo informa en vez de un 401 comun (solo tras la clave: login no lo usa). */
     private void fallo(String usuario, String motivo, String ip, String userAgent, String detalle) {
+        int minutos = registrarFallo(usuario, motivo, ip, userAgent, detalle);
+        if (minutos > 0) {
+            throw bloqueada(minutos);
+        }
+    }
+
+    /** Registra el fallo y devuelve los minutos de bloqueo si con este se bloqueo la cuenta (0 si no). */
+    private int registrarFallo(String usuario, String motivo, String ip, String userAgent, String detalle) {
         int minutos = repo.loginFallido(usuario, motivo);
         acceso.registrar(usuario, "MFA".equals(motivo) ? "MFA_FALLIDO" : "LOGIN_FALLIDO", ip, userAgent,
                 detalle == null ? "motivo=" + motivo : "motivo=" + motivo + "; " + detalle);
         if (minutos > 0) {
             acceso.registrar(usuario, "CUENTA_BLOQUEADA", ip, userAgent, "minutos=" + minutos);
-            throw bloqueada(minutos);
         }
+        return minutos;
     }
 
     private static SilaException bloqueada(int minutos) {

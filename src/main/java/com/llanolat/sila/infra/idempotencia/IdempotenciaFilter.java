@@ -35,7 +35,7 @@ import org.springframework.web.util.ContentCachingResponseWrapper;
  *  - Aplica a POST/PUT/PATCH/DELETE de /api/v1, menos /auth y /usuarios (sus respuestas llevan claves).
  *  - La clave es opcional, salvo en las rutas de {@link IdempotenciaProps#obligatoriaEn()}.
  *  - La clave es por usuario. Misma clave con otro contenido -> 422; misma clave aun en curso -> 409.
- *  - Solo se guardan respuestas EXITOSAS (2xx); si falla, la clave se libera para reintentar.
+ *  - Solo se guardan respuestas EXITOSAS (2xx); si la cadena falla, la clave se libera para reintentar.
  *
  * Va DESPUES de la autorizacion (ya se sabe quien es y que puede hacer), y no es un bean:
  * lo crea la cadena de seguridad para que Spring no lo registre dos veces.
@@ -119,17 +119,24 @@ public class IdempotenciaFilter extends OncePerRequestFilter {
         }
 
         ContentCachingResponseWrapper envuelta = new ContentCachingResponseWrapper(res);
-        boolean guardada = false;
+        boolean liberar = true;
         try {
             chain.doFilter(new CuerpoCacheado(req, cuerpo), envuelta);
             int estado = envuelta.getStatus();
             if (estado >= 200 && estado < 300) {
-                repo.completar(usuario, clave, estado,
-                        new String(envuelta.getContentAsByteArray(), StandardCharsets.UTF_8));
-                guardada = true;
+                // La operacion ya se confirmo: desde aqui la clave NO se libera, pase lo que pase,
+                // o un reintento la ejecutaria otra vez (venta o pago duplicado).
+                liberar = false;
+                try {
+                    repo.completar(usuario, clave, estado,
+                            new String(envuelta.getContentAsByteArray(), StandardCharsets.UTF_8));
+                } catch (RuntimeException e) {
+                    log.error("La operacion se confirmo pero no se pudo guardar la respuesta de la Idempotency-Key; "
+                            + "los reintentos con esa clave daran 409 hasta que expire.", e);
+                }
             }
         } finally {
-            if (!guardada) {
+            if (liberar) {
                 try {
                     repo.liberar(usuario, clave);
                 } catch (RuntimeException e) {

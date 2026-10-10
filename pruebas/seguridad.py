@@ -320,6 +320,8 @@ try:
         ('PUT', f'/catalogos/proveedores/{G}', {}, {401}, {400}, {400}),
         ('PUT', f'/catalogos/productos/{G}', {}, {401}, {400}, {400}),
         ('POST', '/catalogos/productos', {}, {401}, {403}, {400}),
+        ('POST', '/finanzas/categorias', {}, {401}, {403}, {400}),
+        ('DELETE', f'/finanzas/categorias/{G}', None, {401}, {403}, {204, 404, 409}),
         ('PATCH', f'/catalogos/clientes/{G}/estado', {'activo': True}, {401}, {403}, {404, 409}),
         ('PATCH', f'/catalogos/proveedores/{G}/estado', {'activo': True}, {401}, {403}, {404, 409}),
         ('PATCH', f'/catalogos/productos/{G}/estado', {'activo': True}, {401}, {403}, {404, 409}),
@@ -689,8 +691,12 @@ try:
         r = auth('/login', {'usuario': u_blq, 'clave': f'mal{i}'})
     chk('intentos 1 a 4 -> 401', r.status_code == 401)
     r = auth('/login', {'usuario': u_blq, 'clave': 'mal5'})
-    chk('5.o intento -> 423 cuenta bloqueada', r.status_code == 423 and r.json()['code'] == 20014, r.text)
-    chk('bloqueada: ni con la clave correcta entra -> 423', auth('/login', {'usuario': u_blq, 'clave': pw_blq}).status_code == 423)
+    desconocido = auth('/login', {'usuario': 'no.existe.' + SUF, 'clave': 'x'})
+    chk('5.o intento (la cuenta se bloquea) responde IGUAL que un usuario inexistente: 401, mismo codigo y mensaje',
+        r.status_code == 401 and r.json() == desconocido.json(), (r.status_code, r.text, desconocido.text))
+    r = auth('/login', {'usuario': u_blq, 'clave': pw_blq})
+    chk('bloqueada: ni con la clave correcta entra, y tampoco revela el bloqueo (401 igual)',
+        r.status_code == 401 and r.json() == desconocido.json(), (r.status_code, r.text))
     r = llamar('POST', f'/usuarios/{id_blq}/desbloquear', acc_admin)
     chk('ADMIN desbloquea', r.status_code == 200 and r.json()['bloqueado'] is False, r.text)
     chk('tras desbloquear entra (CAMBIAR_CLAVE)', auth('/login', {'usuario': u_blq, 'clave': pw_blq}).json().get('estado') == 'CAMBIAR_CLAVE')
@@ -702,6 +708,38 @@ try:
     r = auth('/logout', cookies={'sila_refresh': ck})
     chk('logout 204 y cookie borrada', r.status_code == 204 and 'Max-Age=0' in r.headers.get('Set-Cookie', ''), r.headers)
     chk('tras logout la cookie no renueva', auth('/refresh', cookies={'sila_refresh': ck}).status_code == 401)
+
+    seccion('11b. Regresiones: Authorization invalido en refresh/logout y token MFA tras restablecer la clave')
+    malo = acc_admin[:-3] + 'abc'   # el filtro Bearer lo rechaza igual que a uno vencido
+    j = auth('/login', {'usuario': U_OPER, 'clave': N_OPER})
+    ck = j.cookies.get('sila_refresh')
+    r = auth('/refresh', token=malo, cookies={'sila_refresh': ck})
+    chk('refresh con un Authorization invalido/vencido igual renueva (200)', r.status_code == 200 and r.json().get('access_token'), r.text)
+    ck = r.cookies.get('sila_refresh') or ck
+    r = auth('/logout', token=malo, cookies={'sila_refresh': ck})
+    chk('logout con un Authorization invalido/vencido igual cierra (204)', r.status_code == 204, r.text)
+    chk('una ruta protegida con ese mismo token sigue dando 401', llamar('GET', '/catalogos/clientes', malo).status_code == 401)
+
+    u_m = f't.mfa.{SUF}'
+    r = llamar('POST', '/usuarios', acc_admin, {'usuario': u_m, 'nombre': 'Prueba MFA', 'email': f'{u_m}@example.com', 'rol': 'OPERATIVO'})
+    id_m, pw_m = r.json()['usuario']['id_usuario'], r.json()['clave_temporal']
+    n_m = 'Clave-Mfa-' + secrets.token_hex(5) + '!'
+    acc_m = entrar_operativo(u_m, pw_m, n_m)
+    sec_m = auth('/mfa/configurar', None, acc_m).json()['secreto']
+    j = auth('/mfa/activar', {'codigo': totp(sec_m)}, acc_m).json()
+    resp_m = j.get('codigos_respaldo', [])
+    chk('usuario de prueba con MFA activo y codigos de respaldo', j.get('estado') == 'MFA_ACTIVADO' and len(resp_m) == 10, j)
+    t_totp = auth('/login', {'usuario': u_m, 'clave': n_m}).json()['token_temporal']
+    t_resp = auth('/login', {'usuario': u_m, 'clave': n_m}).json()['token_temporal']
+    r = llamar('POST', f'/usuarios/{id_m}/restablecer-clave', acc_admin)
+    chk('ADMIN restablece la clave de esa persona', r.status_code == 200 and r.json().get('clave_temporal'), r.text)
+    paso_m = int(time.time()) // 30 + 1
+    j = auth('/mfa/verificar', {'codigo': totp(sec_m, paso_m)}, t_totp).json()
+    chk('token MFA viejo + codigo valido tras el reset -> pide CAMBIAR_CLAVE, no da acceso',
+        j.get('estado') == 'CAMBIAR_CLAVE' and not j.get('access_token'), j)
+    j = auth('/mfa/respaldo', {'codigo_respaldo': resp_m[0]}, t_resp).json()
+    chk('token MFA viejo + codigo de respaldo tras el reset -> pide CAMBIAR_CLAVE, no da acceso',
+        j.get('estado') == 'CAMBIAR_CLAVE' and not j.get('access_token'), j)
 
     chk('NINGUNA respuesta de toda la corrida dejo ver trazas, clases ni SQL', not fugas, fugas[:3])
 

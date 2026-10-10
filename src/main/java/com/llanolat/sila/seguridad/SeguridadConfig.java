@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,6 +20,8 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
@@ -58,7 +61,8 @@ public class SeguridadConfig {
                 // Escrituras reservadas a ADMIN. La base las verifica igual; esto responde antes y de forma uniforme.
                 .requestMatchers(HttpMethod.POST, "/api/v1/periodos/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH, "/api/v1/periodos/**", "/api/v1/catalogos/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.POST, "/api/v1/catalogos/productos").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/v1/catalogos/productos", "/api/v1/finanzas/categorias").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/v1/finanzas/categorias/*").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/v1/ventas/*/anular", "/api/v1/cartera/castigos").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/v1/precios-cliente", "/api/v1/parametros/*").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH, "/api/v1/precios-cliente/**").hasRole("ADMIN")
@@ -76,6 +80,17 @@ public class SeguridadConfig {
         return http.build();
     }
 
+    /**
+     * login, refresh y logout viajan con cookie o credenciales, no con token. Si el cliente les manda
+     * un Authorization vencido, el filtro Bearer lo rechazaria con 401 antes de llegar al controlador
+     * (y la renovacion fallaria justo cuando el acceso caduco): en esas rutas se ignora la cabecera.
+     */
+    private static BearerTokenResolver resolverSinRutasPublicas() {
+        DefaultBearerTokenResolver normal = new DefaultBearerTokenResolver();
+        Set<String> publicas = Set.of(AUTH + "/login", AUTH + "/refresh", AUTH + "/logout");
+        return req -> publicas.contains(req.getRequestURI()) ? null : normal.resolve(req);
+    }
+
     private void comun(HttpSecurity http) throws Exception {
         http.csrf(c -> c.disable())
             .cors(Customizer.withDefaults())
@@ -85,6 +100,7 @@ public class SeguridadConfig {
                 .referrerPolicy(r -> r.policy(ReferrerPolicy.NO_REFERRER)))
             .exceptionHandling(e -> e.authenticationEntryPoint(noAutenticado()).accessDeniedHandler(sinPermiso()))
             .oauth2ResourceServer(o -> o
+                .bearerTokenResolver(resolverSinRutasPublicas())
                 .jwt(j -> j.jwtAuthenticationConverter(convertidor()))
                 .authenticationEntryPoint(noAutenticado())
                 .accessDeniedHandler(sinPermiso()));
