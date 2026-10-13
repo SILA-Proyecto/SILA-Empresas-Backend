@@ -17,6 +17,7 @@ import com.llanolat.sila.catalogos.repository.ProductoRepository;
 import com.llanolat.sila.catalogos.repository.ProveedorRepository;
 import com.llanolat.sila.infra.Page;
 import com.llanolat.sila.infra.SilaException;
+import com.llanolat.sila.insumos.service.InsumoService;
 import java.math.BigDecimal;
 import org.springframework.stereotype.Service;
 
@@ -40,15 +41,17 @@ public class CatalogoService {
     private final ProductoRepository productos;
     private final CatalogoRepository catalogo;
     private final CatalogoConsultaRepository lectura;
+    private final InsumoService insumos;
 
     public CatalogoService(ClienteRepository clientes, ProveedorRepository proveedores,
                            ProductoRepository productos, CatalogoRepository catalogo,
-                           CatalogoConsultaRepository lectura) {
+                           CatalogoConsultaRepository lectura, InsumoService insumos) {
         this.clientes = clientes;
         this.proveedores = proveedores;
         this.productos = productos;
         this.catalogo = catalogo;
         this.lectura = lectura;
+        this.insumos = insumos;
     }
 
     // ---------- clientes ----------
@@ -120,8 +123,21 @@ public class CatalogoService {
         return lectura.productos(texto, activo, page, size, sort);
     }
 
+    /**
+     * Crea el producto y, si trae receta, la guarda. Son dos procedimientos (cada uno hace su COMMIT): si la receta
+     * falla el producto ya existe, y el mensaje lo dice para que se corrija con PUT /productos/{id}/receta.
+     */
     public ProductoDto crearProducto(CrearProductoRequest r) {
-        return producto(productos.crear(r));
+        long id = productos.crear(r);
+        if (r.receta() != null && !r.receta().isEmpty()) {
+            try {
+                insumos.definirReceta(id, r.receta());
+            } catch (SilaException e) {
+                throw SilaException.de(e.getCodigo(), "El producto se creo (id " + id
+                        + ") pero la receta no se guardo: " + e.getMessage());
+            }
+        }
+        return producto(id);
     }
 
     public ProductoDto actualizarProducto(long id, ActualizarProductoRequest r) {

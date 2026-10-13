@@ -359,6 +359,20 @@ try:
         ('GET', f'/cartera/clientes/{G}/ventas-pendientes', None, {401}, {200}, {200}),
         ('POST', '/cartera/abonos', {}, {401}, {400}, {400}),
         ('POST', '/cartera/castigos', {'id_cliente': G, 'motivo': 'Motivo de prueba largo'}, {401}, {403}, {404, 409}),
+        ('GET', '/insumos?size=1', None, {401}, {200}, {200}),
+        ('GET', '/insumos/resumen', None, {401}, {200}, {200}),
+        ('GET', '/insumos/compras?size=1', None, {401}, {200}, {200}),
+        ('GET', '/insumos/ajustes?size=1', None, {401}, {200}, {200}),
+        ('GET', f'/insumos/consumos?id_lote={G}', None, {401}, {200}, {200}),
+        ('GET', f'/insumos/{G}', None, {401}, {404}, {404}),
+        ('POST', '/insumos', {}, {401}, {403}, {400}),
+        ('PUT', f'/insumos/{G}', {'nombre': 'Nombre Valido', 'unidad_medida': 'KG', 'stock_minimo': 0}, {401}, {403}, {404}),
+        ('PATCH', f'/insumos/{G}/estado', {'activo': True}, {401}, {403}, {404}),
+        ('POST', '/insumos/compras', {}, {401}, {403}, {400}),
+        ('POST', f'/insumos/compras/{G}/anular', {'motivo': 'Motivo de prueba largo'}, {401}, {403}, {404}),
+        ('POST', '/insumos/ajustes', {}, {401}, {400}, {400}),
+        ('GET', f'/catalogos/productos/{G}/receta', None, {401}, {404}, {404}),
+        ('PUT', f'/catalogos/productos/{G}/receta', {'lineas': []}, {401}, {403}, {404}),
         ('GET', '/parametros', None, {401}, {200}, {200}),
         ('PUT', '/parametros/NO_EXISTE', {'valor': 1}, {401}, {403}, {404}),
         ('GET', '/auth/sesiones', None, {401}, {200}, {200}),
@@ -639,7 +653,7 @@ try:
     chk('a otro cliente se le muestra el de lista', float(llamar('GET', f'/ventas/precios?id_cliente={cf}&texto={sku2}', acc_oper).json()['items'][0]['precio_aplicable']) == 10)
 
     plazo = [x for x in llamar('GET', '/parametros', acc_oper).json() if x['clave'] == 'PLAZO_CREDITO_DIAS'][0]
-    chk('parametros: plazo de credito = 30 y el IVA por defecto = 19 existe', float(plazo['valor']) == 30 and any(x['clave'] == 'IVA_DEFECTO_PORCENTAJE' and float(x['valor']) == 19 for x in llamar('GET', '/parametros', acc_oper).json()))
+    chk('parametros: plazo de credito = 30 y el IVA por defecto existe (su valor lo fija el usuario)', float(plazo['valor']) == 30 and any(x['clave'] == 'IVA_DEFECTO_PORCENTAJE' for x in llamar('GET', '/parametros', acc_oper).json()))
     chk('un OPERATIVO no cambia parametros -> 403', llamar('PUT', '/parametros/PLAZO_CREDITO_DIAS', acc_oper, {'valor': 45}).status_code == 403)
     chk('valor fuera de rango -> 400 (plazo maximo 365)', llamar('PUT', '/parametros/PLAZO_CREDITO_DIAS', acc_admin, {'valor': 9999}).status_code == 400)
     r = llamar('PUT', '/parametros/PLAZO_CREDITO_DIAS', acc_admin, {'valor': 45})
@@ -682,6 +696,122 @@ try:
     llamar('PATCH', f"/precios-cliente/{pc['id_precio']}/estado", acc_admin, {'activo': False})
     llamar('PATCH', f'/catalogos/productos/{prod2}/estado', acc_admin, {'activo': False})
     llamar('PATCH', f'/catalogos/clientes/{cli}/estado', acc_admin, {'activo': False})
+
+    seccion('9f. Insumos, recetas y costo del lote (una pasada; insumos y producto desechables)')
+    def num(x): return float(x)
+    tag = secrets.token_hex(3).upper()
+    cod_az, cod_en = 'TIAZ' + tag, 'TIEN' + tag
+    r = llamar('POST', '/insumos', acc_oper, {'codigo': cod_az, 'nombre': 'PRUEBA AZUCAR', 'unidad_medida': 'KG', 'stock_minimo': 2})
+    chk('un OPERATIVO no crea insumos -> 403', r.status_code == 403, r.text)
+    r = llamar('POST', '/insumos', acc_admin, {'codigo': 'abc', 'nombre': 'X', 'unidad_medida': 'KG', 'stock_minimo': 0})
+    chk('codigo en minusculas -> 400', r.status_code == 400, r.text)
+    r = llamar('POST', '/insumos', acc_admin, {'codigo': cod_az, 'nombre': 'PRUEBA AZUCAR', 'unidad_medida': 'KG', 'stock_minimo': 2})
+    az = r.json().get('id_insumo')
+    chk('ADMIN crea el insumo -> 201 con stock 0 y costo 0', r.status_code == 201 and az and num(r.json()['stock_actual']) == 0 and num(r.json()['costo_promedio']) == 0, r.text)
+    r = llamar('POST', '/insumos', acc_admin, {'codigo': cod_az, 'nombre': 'OTRO', 'unidad_medida': 'KG', 'stock_minimo': 0})
+    chk('codigo repetido -> 409', r.status_code == 409, r.text)
+    r = llamar('POST', '/insumos', acc_admin, {'codigo': cod_en, 'nombre': 'PRUEBA ENVASE', 'unidad_medida': 'UND', 'stock_minimo': 0})
+    en = r.json().get('id_insumo'); chk('segundo insumo (envases, UND) creado', r.status_code == 201 and en, r.text)
+
+    compra = lambda tok, cuerpo, clave=True: (con_clave if clave else llamar)('POST', '/insumos/compras', tok, cuerpo)
+    c1 = {'id_insumo': az, 'cantidad': 10, 'valor_total': 40000, 'referencia': 'FACT-PRUEBA-1'}
+    chk('un OPERATIVO no registra compras -> 403', compra(acc_oper, c1).status_code == 403)
+    chk('compra sin Idempotency-Key -> 400', compra(acc_admin, c1, clave=False).status_code == 400)
+    chk('compra con fecha futura -> 400 con el campo marcado', 'fecha' in (compra(acc_admin, {**c1, 'fecha': '2099-01-01'}).json().get('fields') or {}))
+    r = compra(acc_admin, {**c1, 'id_proveedor': prov})
+    chk('proveedor LECHERO en una compra de insumos -> 409 (debe ser de tipo INSUMOS)', r.status_code == 409 and r.json()['code'] == 20006, r.text)
+    r = compra(acc_admin, c1)
+    id_c1 = r.json().get('id_compra')
+    chk('compra 1: 10 kg por 40000 -> 201, costo unitario 4000', r.status_code == 201 and num(r.json()['costo_unitario']) == 4000 and r.json()['estado'] == 'VIGENTE', r.text)
+    r = compra(acc_admin, {'id_insumo': az, 'cantidad': 10, 'valor_total': 60000})
+    id_c2 = r.json().get('id_compra'); r = llamar('GET', f'/insumos/{az}', acc_oper).json()
+    chk('compra 2: 10 kg por 60000 -> promedio ponderado 5000 y stock 20', num(r['stock_actual']) == 20 and num(r['costo_promedio']) == 5000 and num(r['valor_inventario']) == 100000, str(r))
+    r = compra(acc_admin, {'id_insumo': en, 'cantidad': 100, 'valor_total': 20000})
+    chk('envases: 100 und por 20000 -> 200 c/u', r.status_code == 201 and num(r.json()['costo_unitario']) == 200, r.text)
+
+    # --- receta al crear el producto
+    sku2 = 'TR' + secrets.token_hex(4).upper()
+    receta = [{'id_insumo': az, 'cantidad': 0.5}, {'id_insumo': en, 'cantidad': 1}]
+    r = llamar('POST', '/catalogos/productos', acc_admin, {'codigo_sku': sku2, 'nombre': 'PRUEBA RECETA ' + sku2, 'unidad_medida': 'UND', 'precio_base': 1000, 'tarifa_iva': 0,
+                                                            'receta': [{'id_insumo': az, 'cantidad': 0.5}, {'id_insumo': az, 'cantidad': 1}]})
+    chk('receta con un insumo repetido -> el producto se crea pero avisa que la receta no se guardo', r.status_code == 400 and 'receta no se guardo' in r.text, r.text)
+    sku3 = 'TS' + secrets.token_hex(4).upper()
+    r = llamar('POST', '/catalogos/productos', acc_admin, {'codigo_sku': sku3, 'nombre': 'PRUEBA RECETA ' + sku3, 'unidad_medida': 'UND', 'precio_base': 1000, 'tarifa_iva': 0, 'receta': receta})
+    pr2 = r.json().get('id_producto'); chk('producto creado con receta -> 201', r.status_code == 201 and pr2, r.text)
+    p_dup = next((x['id_producto'] for x in llamar('GET', f'/catalogos/productos?texto={sku2}', acc_admin).json()['items']), None)
+    r = llamar('GET', f'/catalogos/productos/{pr2}/receta', acc_oper)
+    rj = r.json()
+    chk('la receta trae 2 lineas, costo de insumos por unidad 2700 y alcanza para 40 unidades',
+        r.status_code == 200 and len(rj['lineas']) == 2 and num(rj['costo_insumos_unitario']) == 2700 and rj['unidades_posibles'] == 40, r.text)
+    chk('cada linea trae su valor: azucar 0.5 x 5000 = 2500', any(num(l['valor_por_unidad']) == 2500 and l['unidad_insumo'] == 'KG' for l in rj['lineas']), r.text)
+    chk('un OPERATIVO no cambia recetas -> 403', llamar('PUT', f'/catalogos/productos/{pr2}/receta', acc_oper, {'lineas': []}).status_code == 403)
+    chk('insumo inexistente en la receta -> 404', llamar('PUT', f'/catalogos/productos/{pr2}/receta', acc_admin, {'lineas': [{'id_insumo': 999999999, 'cantidad': 1}]}).status_code == 404)
+    chk('cantidad 0 en la receta -> 400', llamar('PUT', f'/catalogos/productos/{pr2}/receta', acc_admin, {'lineas': [{'id_insumo': az, 'cantidad': 0}]}).status_code == 400)
+    chk('la receta no cambio tras los intentos fallidos', len(llamar('GET', f'/catalogos/productos/{pr2}/receta', acc_oper).json()['lineas']) == 2)
+
+    # --- el lote descuenta insumos y suma su costo
+    lb = {'id_producto': pr2, 'litros_leche_usados': 5, 'cantidad_obtenida': 10, 'costo_por_litro': 0}
+    r = con_clave('POST', '/produccion/lotes', acc_oper, lb)
+    lote2 = r.json()
+    chk('lote de 10 und: costo de insumos 27000 (5 kg x 5000 + 10 envases x 200), leche 0', r.status_code == 201 and num(lote2['costo_insumos']) == 27000 and num(lote2['costo_leche']) == 0 and num(lote2['costo_total']) == 27000 and num(lote2['costo_unitario']) == 2700, r.text)
+    r = llamar('GET', f"/insumos/consumos?id_lote={lote2['id_lote']}", acc_oper)
+    chk('el lote registra sus 2 consumos con el costo congelado', r.status_code == 200 and len(r.json()) == 2 and sorted(num(x['valor']) for x in r.json()) == [2000, 25000], r.text)
+    chk('stock descontado: azucar 15, envases 90', num(llamar('GET', f'/insumos/{az}', acc_oper).json()['stock_actual']) == 15 and num(llamar('GET', f'/insumos/{en}', acc_oper).json()['stock_actual']) == 90)
+    # una compra nueva cambia el promedio pero no el costo ya congelado del lote
+    c3 = compra(acc_admin, {'id_insumo': az, 'cantidad': 5, 'valor_total': 50000}).json()
+    id_c3 = c3.get('id_compra')
+    chk('compra 3: el promedio sube a 6250', num(llamar('GET', f'/insumos/{az}', acc_oper).json()['costo_promedio']) == 6250)
+    chk('el costo del lote ya producido no cambia (27000)', num(llamar('GET', f"/produccion/lotes?id_producto={pr2}", acc_oper).json()['items'][0]['costo_total']) == 27000)
+    # sin stock suficiente: no se crea nada
+    r = con_clave('POST', '/produccion/lotes', acc_oper, {**lb, 'cantidad_obtenida': 1000})
+    chk('lote que necesita mas insumo del que hay -> 409 (20002) con el nombre del insumo', r.status_code == 409 and r.json()['code'] == 20002 and 'PRUEBA' in r.json()['message'], r.text)
+    chk('el lote fallido no dejo nada: 1 lote y stock del producto 10',
+        llamar('GET', f'/produccion/lotes?id_producto={pr2}', acc_oper).json()['total'] == 1
+        and num(llamar('GET', f'/inventario?texto={sku3}', acc_oper).json()['items'][0]['stock_actual']) == 10)
+
+    # --- ajustes
+    aj = lambda tok, tipo, cant: con_clave('POST', '/insumos/ajustes', tok, {'id_insumo': az, 'tipo_ajuste': tipo, 'cantidad': cant, 'observacion': 'Ajuste de prueba'})
+    r = aj(acc_oper, 'MERMA', 1)
+    chk('merma de 1 kg por OPERATIVO -> 201, delta -1 valorado al promedio (-6250)', r.status_code == 201 and num(r.json()['cantidad_delta']) == -1 and num(r.json()['valor_delta']) == -6250, r.text)
+    r = aj(acc_oper, 'CORRECCION_MAS', 1)
+    chk('sumar stock por OPERATIVO -> 403 (20008)', r.status_code == 403 and r.json()['code'] == 20008, r.text)
+    chk('correccion hacia arriba por ADMIN -> 201', aj(acc_admin, 'CORRECCION_MAS', 1).status_code == 201)
+    r = aj(acc_oper, 'MERMA', 1000)
+    chk('ajuste que dejaria el stock negativo -> 409 (20002)', r.status_code == 409 and r.json()['code'] == 20002, r.text)
+
+    # --- anulacion de compras (stock actual del azucar: 20)
+    chk('un OPERATIVO no anula compras -> 403', con_clave('POST', f'/insumos/compras/{id_c2}/anular', acc_oper, {'motivo': 'Intento de un operativo'}).status_code == 403)
+    r = con_clave('POST', f'/insumos/compras/{id_c2}/anular', acc_admin, {'motivo': 'Compra de prueba anulada'})
+    a = llamar('GET', f'/insumos/{az}', acc_oper).json()
+    chk('ADMIN anula la compra 2 -> ANULADA, stock 10 y promedio 6500', r.status_code == 200 and r.json()['estado'] == 'ANULADA' and num(a['stock_actual']) == 10 and num(a['costo_promedio']) == 6500, r.text + str(a))
+    chk('anular dos veces -> 409', con_clave('POST', f'/insumos/compras/{id_c2}/anular', acc_admin, {'motivo': 'Segunda anulacion'}).status_code == 409)
+    r = con_clave('POST', '/produccion/lotes', acc_oper, {**lb, 'cantidad_obtenida': 30})
+    chk('con el stock ya menor, un lote de 30 und (15 kg) -> 409', r.status_code == 409 and r.json()['code'] == 20002, r.text)
+    chk('anular una compra cuando ya no alcanza el stock para devolverla -> 409',
+        con_clave('POST', f'/insumos/compras/{id_c3}/anular', acc_admin, {'motivo': 'Compra 3 anulada de prueba'}).status_code == 200
+        and con_clave('POST', f'/insumos/compras/{id_c1}/anular', acc_admin, {'motivo': 'Compra 1 sin stock suficiente'}).status_code == 409)
+    chk('listado de compras del insumo: 3, con una VIGENTE', llamar('GET', f'/insumos/compras?id_insumo={az}', acc_oper).json()['total'] == 3
+        and llamar('GET', f'/insumos/compras?id_insumo={az}&estado=VIGENTE', acc_oper).json()['total'] == 1)
+
+    # --- reglas de edicion y estado
+    r = llamar('PUT', f'/insumos/{az}', acc_admin, {'nombre': 'PRUEBA AZUCAR', 'unidad_medida': 'GR', 'stock_minimo': 2})
+    chk('cambiar la unidad de un insumo con movimientos -> 409', r.status_code == 409 and r.json()['code'] == 20006, r.text)
+    r = llamar('PUT', f'/insumos/{az}', acc_admin, {'nombre': 'PRUEBA AZUCAR REFINADA', 'unidad_medida': 'KG', 'stock_minimo': 50})
+    chk('editar nombre y stock minimo -> 200 y queda bajo el minimo', r.status_code == 200 and r.json()['nombre'].endswith('REFINADA') and r.json()['bajo_minimo'] is True, r.text)
+    chk('el listado puede filtrar los insumos bajo el minimo', any(x['id_insumo'] == az for x in llamar('GET', '/insumos?bajo_minimo=true&size=100', acc_oper).json()['items']))
+    r = llamar('PATCH', f'/insumos/{az}/estado', acc_admin, {'activo': False})
+    chk('desactivar un insumo que esta en la receta de un producto activo -> 409', r.status_code == 409 and r.json()['code'] == 20006, r.text)
+    cu = llamar('GET', '/periodos/actual', acc_oper).json()
+    chk('la quincena trae compras_insumos', 'compras_insumos' in cu and num(cu['compras_insumos']) >= 0, str(cu))
+    r = llamar('GET', '/insumos/resumen', acc_oper)
+    chk('resumen de insumos', r.status_code == 200 and {'total_insumos', 'bajo_minimo', 'valor_total'} <= set(r.json()), r.text)
+
+    # --- limpieza: quitar recetas y desactivar lo desechable (los registros quedan; no se pueden borrar)
+    chk('ADMIN vacia la receta -> costo 0', llamar('PUT', f'/catalogos/productos/{pr2}/receta', acc_admin, {'lineas': []}).json()['costo_insumos_unitario'] in (0, 0.0))
+    for pid in (pr2, p_dup):
+        if pid: llamar('PATCH', f'/catalogos/productos/{pid}/estado', acc_admin, {'activo': False})
+    chk('sin receta, el insumo ya se puede desactivar', llamar('PATCH', f'/insumos/{az}/estado', acc_admin, {'activo': False}).status_code == 200)
+    llamar('PATCH', f'/insumos/{en}/estado', acc_admin, {'activo': False})
 
     seccion('10. Bloqueo por intentos y limite de frecuencia')
     u_blq = f't.blq.{SUF}'

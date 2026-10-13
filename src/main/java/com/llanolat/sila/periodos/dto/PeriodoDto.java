@@ -7,7 +7,7 @@ import java.time.LocalDate;
  * Una quincena con su resultado estimado (vw_estado_periodos + vw_resultado_periodo).
  * El resultado es una estimacion de gestion, no un estado contable.
  * resultado_estimado = DEVENGADO (ventas sin IVA - costo de produccion - gastos - cartera castigada).
- * caja_neta = lo cobrado - lo pagado a lecheros - gastos, en la quincena. Son dos miradas distintas.
+ * caja_neta = lo cobrado - lo pagado a lecheros - gastos - compras de insumos, en la quincena. Son dos miradas distintas.
  */
 public record PeriodoDto(
         Long idPeriodo,
@@ -37,5 +37,6 @@ public record PeriodoDto(
         BigDecimal lechePagada,
         BigDecimal lechePorPagar,
         BigDecimal pagosProveedoresCaja,
+        BigDecimal comprasInsumos,
         BigDecimal cajaNeta
 ) {}

@@ -26,7 +26,7 @@ public class ProduccionRepository {
 
     private static final String COLUMNAS_LOTE = """
             id_lote, codigo_lote, id_producto, producto, codigo_sku, unidad_medida, fecha_produccion,
-            litros_leche_usados, cantidad_obtenida, porcentaje_rendimiento, costo_total, costo_unitario,
+            litros_leche_usados, cantidad_obtenida, porcentaje_rendimiento, costo_total, costo_insumos, costo_leche, costo_unitario,
             fecha_vencimiento, dias_restantes, nivel_alerta, usuario_registro, fecha_registro""";
     private static final String COLUMNAS_AJUSTE = """
             id_ajuste, id_producto, producto, codigo_sku, unidad_medida, tipo_ajuste, cantidad_delta,

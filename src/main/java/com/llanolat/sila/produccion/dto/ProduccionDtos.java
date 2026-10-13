@@ -18,7 +18,8 @@ public final class ProduccionDtos {
     public record Lote(
             Long idLote, String codigoLote, Long idProducto, String producto, String codigoSku, String unidadMedida,
             LocalDate fechaProduccion, BigDecimal litrosLecheUsados, BigDecimal cantidadObtenida,
-            BigDecimal porcentajeRendimiento, BigDecimal costoTotal, BigDecimal costoUnitario,
+            BigDecimal porcentajeRendimiento, BigDecimal costoTotal, BigDecimal costoInsumos, BigDecimal costoLeche,
+            BigDecimal costoUnitario,
             LocalDate fechaVencimiento, Integer diasRestantes, String nivelAlerta,
             String usuarioRegistro, LocalDateTime fechaRegistro) {}
 

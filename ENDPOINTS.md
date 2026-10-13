@@ -106,3 +106,15 @@ solo queda en esa tabla.
 | POST | `/api/v1/acopio/pagos` | ADMIN | paga (todo o parte) la leche de una quincena |
 | POST | `/api/v1/acopio/pagos/{id}/anular` | ADMIN | anula un pago con motivo |
 `GET /periodos` ahora incluye las cuentas de la quincena (leche comprada/pagada/por pagar, cobros, caja neta).
+
+## Insumos y recetas
+
+Contrato completo en `docs/CONTRATO_BACKEND.md` del dashboard («Insumos, recetas y costo del lote»).
+
+| Metodo | Ruta | Rol | Procedimiento |
+|---|---|---|---|
+| GET | `/api/v1/insumos` · `/resumen` · `/{id}` · `/compras` · `/ajustes` · `/consumos?id_lote=` | todos | vistas `vw_insumos`, `vw_compras_insumo`, `vw_ajustes_insumo`, `vw_consumos_lote` |
+| POST · PUT · PATCH | `/api/v1/insumos` · `/{id}` · `/{id}/estado` | ADMIN | sp_crear_insumo / sp_actualizar_insumo / sp_cambiar_estado |
+| POST | `/api/v1/insumos/compras` · `/compras/{id}/anular` | ADMIN | sp_registrar_compra / sp_anular_compra |
+| POST | `/api/v1/insumos/ajustes` | OPERATIVO (restas) / ADMIN (correcciones) | sp_registrar_ajuste |
+| GET · PUT | `/api/v1/catalogos/productos/{id}/receta` | todos · ADMIN | `vw_recetas` / sp_definir_receta |

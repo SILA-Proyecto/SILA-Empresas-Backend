@@ -66,6 +66,11 @@ public class SeguridadConfig {
                 .requestMatchers(HttpMethod.POST, "/api/v1/ventas/*/anular", "/api/v1/cartera/castigos").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/v1/precios-cliente", "/api/v1/parametros/*").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH, "/api/v1/precios-cliente/**").hasRole("ADMIN")
+                // Insumos: los ajustes de resta los hace OPERATIVO (la base exige ADMIN para las correcciones); lo demas es ADMIN.
+                .requestMatchers(HttpMethod.POST, "/api/v1/insumos/ajustes").hasAuthority("TIPO_ACCESO")
+                .requestMatchers(HttpMethod.POST, "/api/v1/insumos/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/v1/insumos/**", "/api/v1/catalogos/productos/*/receta").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PATCH, "/api/v1/insumos/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/v1/acopio/precios", "/api/v1/acopio/pagos", "/api/v1/acopio/pagos/*/anular").hasRole("ADMIN")
                 .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                 .anyRequest().hasAuthority("TIPO_ACCESO"));

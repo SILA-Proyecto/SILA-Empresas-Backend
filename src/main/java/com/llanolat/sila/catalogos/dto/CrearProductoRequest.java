@@ -1,7 +1,10 @@
 package com.llanolat.sila.catalogos.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
+import com.llanolat.sila.insumos.dto.InsumosDtos.LineaReceta;
 import java.math.BigDecimal;
+import java.util.List;
 
 public record CrearProductoRequest(
         @NotBlank @Size(max = 20) String codigoSku,
@@ -12,5 +15,7 @@ public record CrearProductoRequest(
         /** Confirmar producto por producto con contabilidad: varios lacteos
             estan excluidos o exentos y otros no. */
         @NotNull @DecimalMin("0") @DecimalMax("100") @Digits(integer = 3, fraction = 2)
-        BigDecimal tarifaIva
+        BigDecimal tarifaIva,
+        /** Opcional: insumos que gasta UNA unidad del producto. Equivale a PUT /productos/{id}/receta tras crearlo. */
+        @Size(max = 30) @Valid List<LineaReceta> receta
 ) {}
