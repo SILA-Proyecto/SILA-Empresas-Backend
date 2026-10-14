@@ -31,3 +31,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### SILA: solo local ###
+ESTADO.md
+pruebas/__pycache__/
