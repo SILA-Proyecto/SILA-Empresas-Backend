@@ -313,6 +313,9 @@ try:
         ('GET', '/ventas', None, {401}, {200}, {200}),
         ('GET', '/inventario', None, {401}, {200}, {200}),
         ('GET', '/notificaciones', None, {401}, {200}, {200}),
+        ('GET', '/comprobantes?size=1', None, {401}, {200}, {200}),
+        ('GET', '/comprobantes/resumen', None, {401}, {200}, {200}),
+        ('GET', f'/comprobantes/VENTA/{G}', None, {401}, {404}, {404}),
         ('PATCH', f'/catalogos/productos/{G}/stock-minimo', {'stock_minimo': 1}, {401}, {403}, {404}),
         ('GET', '/facturas', None, {401}, {200}, {200}),
         ('GET', '/finanzas/categorias', None, {401}, {200}, {200}),
@@ -885,6 +888,32 @@ try:
     chk('un documento ya SUBIDO no vuelve a marcarse -> 409', con_clave('POST', f'/documentos/{did}/error', acc_oper, {'mensaje': 'x'}).status_code == 409)
     r = llamar('GET', f'/documentos?tipo_entidad=RECEPCION_LECHE&id_entidad={rid}&estado_carga=SUBIDO', acc_oper).json()
     chk('el listado filtra por entidad y estado', r['total'] >= 1 and any(i['id_documento'] == did for i in r['items']), str(r)[:200])
+
+    seccion('9h. Comprobantes (solo lectura, con los datos que dejaron las secciones anteriores)')
+    r = llamar('GET', '/comprobantes?size=100', acc_oper)
+    lst = r.json().get('items', []) if r.status_code == 200 else []
+    chk('lista de comprobantes -> 200 con numero tipo "VENTA #123"', r.status_code == 200 and lst and all(
+        x['numero'] == f"{x['tipo']} #{x['id_documento']}" for x in lst), r.text[:300])
+    tipos = {x['tipo'] for x in lst}
+    chk('hay de varios tipos (venta, abono, pago a lechero, compra de insumos y gasto)', {'VENTA', 'ABONO', 'PAGO_LECHERO', 'COMPRA_INSUMO', 'GASTO'} <= tipos, str(tipos))
+    chk('sentido: ventas y abonos INGRESO; pagos, compras y gastos EGRESO', all(
+        (x['sentido'] == 'INGRESO') == (x['tipo'] in ('VENTA', 'ABONO')) for x in lst))
+    r = llamar('GET', '/comprobantes?tipo=GASTO&size=100', acc_oper)
+    chk('filtro por tipo', r.status_code == 200 and r.json()['items'] and all(x['tipo'] == 'GASTO' for x in r.json()['items']), r.text[:200])
+    chk('tipo invalido -> 400', llamar('GET', '/comprobantes?tipo=FACTURA', acc_oper).status_code == 400)
+    chk('sort invalido -> 400', llamar('GET', '/comprobantes?sort=clave,asc', acc_oper).status_code == 400)
+    r = llamar('GET', '/comprobantes/resumen', acc_oper)
+    chk('resumen: neto = ingresos - egresos', r.status_code == 200 and abs(num(r.json()['neto']) - (num(r.json()['ingresos']) - num(r.json()['egresos']))) < 0.01, r.text)
+    for tp in ('VENTA', 'ABONO', 'PAGO_LECHERO', 'COMPRA_INSUMO', 'GASTO'):
+        ej = next((x for x in lst if x['tipo'] == tp), None)
+        if not ej: continue
+        r = llamar('GET', f"/comprobantes/{tp}/{ej['id_documento']}", acc_oper)
+        d = r.json() if r.status_code == 200 else {}
+        bien = r.status_code == 200 and d['comprobante']['numero'] == ej['numero'] and len(d['lineas']) >= 1
+        if tp == 'VENTA': bien = bien and d['subtotal'] is not None and abs(sum(num(l['valor']) for l in d['lineas']) - num(d['comprobante']['monto'])) < 0.01
+        chk(f'detalle {tp}: cabecera y lineas' + (' (lineas suman el total)' if tp == 'VENTA' else ''), bien, r.text[:300])
+    chk('detalle inexistente -> 404', llamar('GET', f'/comprobantes/VENTA/{G}', acc_oper).status_code == 404)
+    chk('detalle con tipo invalido -> 400', llamar('GET', '/comprobantes/XX/1', acc_oper).status_code == 400)
 
     seccion('10. Bloqueo por intentos y limite de frecuencia')
     u_blq = f't.blq.{SUF}'
