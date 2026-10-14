@@ -35,7 +35,7 @@ public class CatalogoConsultaRepository {
     // La vista dice stock_actual; el dashboard, stock.
     private static final String PRODUCTOS = """
             id_producto, codigo_sku, nombre, unidad_medida,
-            precio_base, tarifa_iva, stock_actual AS stock, activo""";
+            precio_base, tarifa_iva, stock_actual AS stock, stock_minimo, bajo_minimo, activo""";
 
     private static final Map<String, String> ORDEN_CLIENTES = Map.of(
             "id_cliente", "id_cliente", "tipo_documento", "tipo_documento",
@@ -48,7 +48,8 @@ public class CatalogoConsultaRepository {
     private static final Map<String, String> ORDEN_PRODUCTOS = Map.of(
             "id_producto", "id_producto", "codigo_sku", "codigo_sku", "nombre", "nombre",
             "unidad_medida", "unidad_medida", "precio_base", "precio_base",
-            "tarifa_iva", "tarifa_iva", "stock", "stock_actual", "activo", "activo");
+            "tarifa_iva", "tarifa_iva", "stock", "stock_actual", "stock_minimo", "stock_minimo",
+            "activo", "activo");
 
     private final ConsultaPaginada paginada;
     private final JdbcClient jdbc;

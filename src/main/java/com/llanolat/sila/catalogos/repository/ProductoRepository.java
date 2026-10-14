@@ -50,6 +50,18 @@ public class ProductoRepository {
         });
     }
 
+    /** Rol OPERATIVO. 0 = sin alerta. El cambio queda en auditoria_cambios. */
+    public void fijarStockMinimo(long idProducto, java.math.BigDecimal minimo) {
+        sila.ejecutar(c -> {
+            try (CallableStatement s = c.prepareCall("{call pkg_alertas.sp_fijar_stock_minimo_producto(?,?)}")) {
+                s.setLong(1, idProducto);
+                s.setBigDecimal(2, minimo);
+                s.execute();
+                return null;
+            }
+        });
+    }
+
     /** Rol ADMIN. El cambio queda en auditoria_cambios. */
     public void actualizarPrecio(long idProducto, ActualizarPrecioRequest r) {
         sila.ejecutar(c -> {

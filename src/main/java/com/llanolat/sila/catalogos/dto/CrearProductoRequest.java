@@ -17,5 +17,7 @@ public record CrearProductoRequest(
         @NotNull @DecimalMin("0") @DecimalMax("100") @Digits(integer = 3, fraction = 2)
         BigDecimal tarifaIva,
         /** Opcional: insumos que gasta UNA unidad del producto. Equivale a PUT /productos/{id}/receta tras crearlo. */
-        @Size(max = 30) @Valid List<LineaReceta> receta
+        @Size(max = 30) @Valid List<LineaReceta> receta,
+        /** Opcional (por defecto 0 = sin alerta de stock minimo). */
+        @DecimalMin("0") @Digits(integer = 8, fraction = 3) BigDecimal stockMinimo
 ) {}

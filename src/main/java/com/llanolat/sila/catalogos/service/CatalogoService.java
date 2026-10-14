@@ -129,6 +129,14 @@ public class CatalogoService {
      */
     public ProductoDto crearProducto(CrearProductoRequest r) {
         long id = productos.crear(r);
+        if (r.stockMinimo() != null && r.stockMinimo().signum() > 0) {
+            try {
+                productos.fijarStockMinimo(id, r.stockMinimo());
+            } catch (SilaException e) {
+                throw SilaException.de(e.getCodigo(), "El producto se creo (id " + id
+                        + ") pero el stock minimo no se guardo: " + e.getMessage());
+            }
+        }
         if (r.receta() != null && !r.receta().isEmpty()) {
             try {
                 insumos.definirReceta(id, r.receta());
@@ -141,7 +149,14 @@ public class CatalogoService {
     }
 
     public ProductoDto actualizarProducto(long id, ActualizarProductoRequest r) {
+        // El minimo (ADMIN) va primero: un 403 no deja el nombre cambiado a medias.
+        if (r.stockMinimo() != null) productos.fijarStockMinimo(id, r.stockMinimo());
         productos.actualizar(id, r);
+        return producto(id);
+    }
+
+    public ProductoDto fijarStockMinimoProducto(long id, java.math.BigDecimal minimo) {
+        productos.fijarStockMinimo(id, minimo);
         return producto(id);
     }
 

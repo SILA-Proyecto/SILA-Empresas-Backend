@@ -15,5 +15,7 @@ public record ProductoDto(
         BigDecimal precioBase,
         BigDecimal tarifaIva,
         BigDecimal stock,
+        BigDecimal stockMinimo,
+        Boolean bajoMinimo,
         Boolean activo
 ) {}

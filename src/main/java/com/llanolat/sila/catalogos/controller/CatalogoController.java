@@ -11,6 +11,7 @@ import com.llanolat.sila.catalogos.dto.CrearProductoRequest;
 import com.llanolat.sila.catalogos.dto.CrearProveedorRequest;
 import com.llanolat.sila.catalogos.dto.ProductoDto;
 import com.llanolat.sila.catalogos.dto.ProveedorDto;
+import com.llanolat.sila.catalogos.dto.StockMinimoRequest;
 import com.llanolat.sila.catalogos.service.CatalogoService;
 import com.llanolat.sila.infra.Page;
 import jakarta.validation.Valid;
@@ -113,10 +114,16 @@ public class CatalogoController {
         return service.crearProducto(r);
     }
 
-    /** OPERATIVO. La unidad solo cambia si el producto no tiene movimientos (ORA-20006). */
+    /** OPERATIVO (ADMIN si trae stock_minimo). La unidad solo cambia si el producto no tiene movimientos (ORA-20006). */
     @PutMapping("/productos/{id}")
     public ProductoDto actualizarProducto(@PathVariable long id, @Valid @RequestBody ActualizarProductoRequest r) {
         return service.actualizarProducto(id, r);
+    }
+
+    /** ADMIN. Alerta de reposicion; 0 la desactiva. */
+    @PatchMapping("/productos/{id}/stock-minimo")
+    public ProductoDto stockMinimoProducto(@PathVariable long id, @Valid @RequestBody StockMinimoRequest r) {
+        return service.fijarStockMinimoProducto(id, r.stockMinimo());
     }
 
     /** ADMIN. Precio y tarifa de IVA cambian juntos (SUPUESTO C-07). */

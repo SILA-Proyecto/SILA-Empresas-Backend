@@ -312,6 +312,8 @@ try:
         ('GET', '/periodos/anios', None, {401}, {200}, {200}),
         ('GET', '/ventas', None, {401}, {200}, {200}),
         ('GET', '/inventario', None, {401}, {200}, {200}),
+        ('GET', '/notificaciones', None, {401}, {200}, {200}),
+        ('PATCH', f'/catalogos/productos/{G}/stock-minimo', {'stock_minimo': 1}, {401}, {403}, {404}),
         ('GET', '/facturas', None, {401}, {200}, {200}),
         ('GET', '/finanzas/categorias', None, {401}, {200}, {200}),
         ('POST', '/catalogos/clientes', {}, {401}, {400}, {400}),
@@ -719,6 +721,9 @@ try:
     r = llamar('POST', '/insumos', acc_admin, {'codigo': cod_az, 'nombre': 'PRUEBA AZUCAR', 'unidad_medida': 'KG', 'stock_minimo': 2})
     az = r.json().get('id_insumo')
     chk('ADMIN crea el insumo -> 201 con stock 0 y costo 0', r.status_code == 201 and az and num(r.json()['stock_actual']) == 0 and num(r.json()['costo_promedio']) == 0, r.text)
+    nt = llamar('GET', '/notificaciones', acc_oper)
+    chk('notificaciones: el insumo nuevo (stock 0, minimo 2) sale AGOTADO y CRITICA', nt.status_code == 200 and any(
+        n['clave'] == f'INSUMO:{az}' and n['tipo'] == 'INSUMO_AGOTADO' and n['severidad'] == 'CRITICA' for n in nt.json()['items']), nt.text)
     r = llamar('POST', '/insumos', acc_admin, {'codigo': cod_az, 'nombre': 'OTRO', 'unidad_medida': 'KG', 'stock_minimo': 0})
     chk('codigo repetido -> 409', r.status_code == 409, r.text)
     r = llamar('POST', '/insumos', acc_admin, {'codigo': cod_en, 'nombre': 'PRUEBA ENVASE', 'unidad_medida': 'UND', 'stock_minimo': 0})
@@ -768,6 +773,16 @@ try:
     r = llamar('GET', f"/insumos/consumos?id_lote={lote2['id_lote']}", acc_oper)
     chk('el lote registra sus 2 consumos con el costo congelado', r.status_code == 200 and len(r.json()) == 2 and sorted(num(x['valor']) for x in r.json()) == [2000, 25000], r.text)
     chk('stock descontado: azucar 15, envases 90', num(llamar('GET', f'/insumos/{az}', acc_oper).json()['stock_actual']) == 15 and num(llamar('GET', f'/insumos/{en}', acc_oper).json()['stock_actual']) == 90)
+    # --- stock minimo de productos y notificaciones
+    chk('notificaciones: con stock 15 y minimo 2 el azucar ya no alerta', not any(n['clave'] == f'INSUMO:{az}' for n in llamar('GET', '/notificaciones', acc_oper).json()['items']))
+    chk('un OPERATIVO no fija el stock minimo -> 403', llamar('PATCH', f'/catalogos/productos/{pr2}/stock-minimo', acc_oper, {'stock_minimo': 50}).status_code == 403)
+    chk('stock minimo negativo -> 400', llamar('PATCH', f'/catalogos/productos/{pr2}/stock-minimo', acc_admin, {'stock_minimo': -1}).status_code == 400)
+    r = llamar('PATCH', f'/catalogos/productos/{pr2}/stock-minimo', acc_admin, {'stock_minimo': 50})
+    chk('ADMIN fija minimo 50 (stock 10) -> el producto sale bajo_minimo', r.status_code == 200 and num(r.json()['stock_minimo']) == 50 and r.json()['bajo_minimo'] is True, r.text)
+    chk('notificaciones: PRODUCTO_BAJO con ADVERTENCIA', any(n['clave'] == f'PRODUCTO:{pr2}' and n['tipo'] == 'PRODUCTO_BAJO' and n['severidad'] == 'ADVERTENCIA'
+        for n in llamar('GET', '/notificaciones', acc_oper).json()['items']))
+    r = llamar('PATCH', f'/catalogos/productos/{pr2}/stock-minimo', acc_admin, {'stock_minimo': 0})
+    chk('minimo 0 desactiva la alerta', r.status_code == 200 and not any(n['clave'] == f'PRODUCTO:{pr2}' for n in llamar('GET', '/notificaciones', acc_oper).json()['items']), r.text)
     # una compra nueva cambia el promedio pero no el costo ya congelado del lote
     c3 = compra(acc_admin, {'id_insumo': az, 'cantidad': 5, 'valor_total': 50000}).json()
     id_c3 = c3.get('id_compra')
