@@ -67,4 +67,12 @@ public class ConsultaPaginada {
 
         return new Page<>(items, total, pag.page(), pag.size());
     }
+
+    /** Una fila agregada (SUM/COUNT...) de la vista con los mismos filtros de la lista. */
+    public <T> T agregar(String columnas, String vista, Filtro filtro, Class<T> tipo) {
+        return jdbc.sql("SELECT " + columnas + " FROM " + vista + filtro.where())
+                   .params(filtro.parametros())
+                   .query(tipo)
+                   .single();
+    }
 }

@@ -373,6 +373,17 @@ try:
         ('POST', '/insumos/ajustes', {}, {401}, {400}, {400}),
         ('GET', f'/catalogos/productos/{G}/receta', None, {401}, {404}, {404}),
         ('PUT', f'/catalogos/productos/{G}/receta', {'lineas': []}, {401}, {403}, {404}),
+        ('GET', '/finanzas/gastos?size=1', None, {401}, {200}, {200}),
+        ('GET', '/finanzas/gastos/resumen', None, {401}, {200}, {200}),
+        ('GET', '/finanzas/gastos/por-categoria', None, {401}, {200}, {200}),
+        ('GET', f'/finanzas/gastos/{G}', None, {401}, {404}, {404}),
+        ('POST', '/finanzas/gastos', {}, {401}, {400}, {400}),
+        ('POST', f'/finanzas/gastos/{G}/anular', {'motivo': 'Gasto digitado por error'}, {401}, {403}, {404}),
+        ('GET', '/documentos?size=1', None, {401}, {200}, {200}),
+        ('GET', f'/documentos/{G}', None, {401}, {404}, {404}),
+        ('POST', '/documentos', {}, {401}, {400}, {400}),
+        ('POST', f'/documentos/{G}/subido', {}, {401}, {400}, {400}),
+        ('POST', f'/documentos/{G}/error', {}, {401}, {400}, {400}),
         ('GET', '/parametros', None, {401}, {200}, {200}),
         ('PUT', '/parametros/NO_EXISTE', {'valor': 1}, {401}, {403}, {404}),
         ('GET', '/auth/sesiones', None, {401}, {200}, {200}),
@@ -812,6 +823,53 @@ try:
         if pid: llamar('PATCH', f'/catalogos/productos/{pid}/estado', acc_admin, {'activo': False})
     chk('sin receta, el insumo ya se puede desactivar', llamar('PATCH', f'/insumos/{az}/estado', acc_admin, {'activo': False}).status_code == 200)
     llamar('PATCH', f'/insumos/{en}/estado', acc_admin, {'activo': False})
+
+    seccion('9g. Gastos y documentos (una pasada; categoria desechable, gasto de 1 peso)')
+    tag = secrets.token_hex(3).upper()
+    r = llamar('POST', '/finanzas/categorias', acc_admin, {'nombre': 'PRUEBA GASTO ' + tag})
+    cat = r.json().get('id'); chk('ADMIN crea la categoria de prueba -> 201', r.status_code == 201 and cat, r.text)
+    g1 = {'id_categoria': cat, 'concepto': 'Gasto de prueba', 'monto': 1}
+    chk('gasto sin Idempotency-Key -> 400', llamar('POST', '/finanzas/gastos', acc_oper, g1).status_code == 400)
+    chk('gasto con monto 0 -> 400', con_clave('POST', '/finanzas/gastos', acc_oper, {**g1, 'monto': 0}).status_code == 400)
+    chk('gasto con fecha futura -> 400', 'fecha_gasto' in (con_clave('POST', '/finanzas/gastos', acc_oper, {**g1, 'fecha_gasto': '2099-01-01'}).json().get('fields') or {}))
+    chk('gasto de una categoria inexistente -> 404', con_clave('POST', '/finanzas/gastos', acc_oper, {**g1, 'id_categoria': G}).status_code == 404)
+    r = con_clave('POST', '/finanzas/gastos', acc_oper, g1)
+    gid = r.json().get('id_gasto')
+    chk('OPERATIVO registra el gasto -> 201 con categoria y quincena', r.status_code == 201 and gid and r.json()['categoria'] == 'PRUEBA GASTO ' + tag and float(r.json()['monto']) == 1, r.text)
+    r = llamar('GET', f'/finanzas/gastos?id_categoria={cat}', acc_oper).json()
+    chk('el filtro por categoria encuentra el gasto', r['total'] == 1 and r['items'][0]['id_gasto'] == gid, str(r))
+    r = llamar('GET', f'/finanzas/gastos/resumen?id_categoria={cat}&texto=PRUEBA', acc_oper).json()
+    chk('el resumen suma 1 peso en 1 gasto', float(r['total']) == 1 and r['cantidad'] == 1, str(r))
+    chk('GET /finanzas/gastos/{id} -> 200', llamar('GET', f'/finanzas/gastos/{gid}', acc_oper).status_code == 200)
+    chk('el resumen por categoria sigue en /por-categoria', llamar('GET', '/finanzas/gastos/por-categoria', acc_oper).status_code == 200)
+    chk('un OPERATIVO no anula gastos -> 403', con_clave('POST', f'/finanzas/gastos/{gid}/anular', acc_oper, {'motivo': 'Gasto digitado por error'}).status_code == 403)
+    chk('motivo corto -> 400', con_clave('POST', f'/finanzas/gastos/{gid}/anular', acc_admin, {'motivo': 'corto'}).status_code == 400)
+    r = con_clave('POST', f'/finanzas/gastos/{gid}/anular', acc_admin, {'motivo': 'Gasto digitado por error'})
+    chk('ADMIN anula el gasto -> ANULADO con motivo y usuario', r.status_code == 200 and r.json()['estado'] == 'ANULADO' and r.json()['motivo_anulacion'] == 'Gasto digitado por error' and r.json()['usuario_anulacion'] and r.json()['fecha_anulacion'], r.text)
+    chk('anular dos veces -> 409', con_clave('POST', f'/finanzas/gastos/{gid}/anular', acc_admin, {'motivo': 'Gasto digitado por error'}).status_code == 409)
+    chk('anular un gasto inexistente -> 404', con_clave('POST', f'/finanzas/gastos/{G}/anular', acc_admin, {'motivo': 'Gasto digitado por error'}).status_code == 404)
+    r = llamar('GET', f'/finanzas/gastos/resumen?id_categoria={cat}', acc_oper).json()
+    chk('el gasto anulado ya no suma en el resumen', float(r['total']) == 0 and r['cantidad'] == 0, str(r))
+    r = llamar('GET', f'/finanzas/gastos?id_categoria={cat}&estado=ANULADO', acc_oper).json()
+    chk('la lista lo sigue mostrando con estado=ANULADO', r['total'] == 1, str(r))
+    llamar('DELETE', f'/finanzas/categorias/{cat}', acc_admin)
+    chk('categoria inactiva -> 409', con_clave('POST', '/finanzas/gastos', acc_oper, g1).status_code == 409)
+
+    rid = ant['id_recepcion']
+    d1 = {'tipo_entidad': 'RECEPCION_LECHE', 'id_entidad': rid, 'nombre_archivo': 'prueba-' + tag + '.pdf'}
+    chk('documento de una entidad inexistente -> 404', con_clave('POST', '/documentos', acc_oper, {**d1, 'id_entidad': G}).status_code == 404)
+    chk('documento con tipo invalido -> 400', con_clave('POST', '/documentos', acc_oper, {**d1, 'tipo_entidad': 'OTRO'}).status_code == 400)
+    r = con_clave('POST', '/documentos', acc_oper, d1)
+    did = r.json().get('id_documento')
+    chk('se encola el documento -> 201 PENDIENTE, application/pdf', r.status_code == 201 and did and r.json()['estado_carga'] == 'PENDIENTE' and r.json()['mime_type'] == 'application/pdf', r.text)
+    r = con_clave('POST', f'/documentos/{did}/error', acc_oper, {'mensaje': 'Sin red'})
+    chk('marcar error -> ERROR con 1 intento', r.status_code == 200 and r.json()['estado_carga'] == 'ERROR' and r.json()['intentos'] == 1, r.text)
+    chk('checksum invalido -> 400', con_clave('POST', f'/documentos/{did}/subido', acc_oper, {'drive_file_id': 'abc', 'checksum_sha256': 'xyz'}).status_code == 400)
+    r = con_clave('POST', f'/documentos/{did}/subido', acc_oper, {'drive_file_id': 'drv-' + tag, 'drive_url': 'https://drive.example/' + tag, 'checksum_sha256': 'a' * 64})
+    chk('marcar subido -> SUBIDO con fecha_carga', r.status_code == 200 and r.json()['estado_carga'] == 'SUBIDO' and r.json()['fecha_carga'], r.text)
+    chk('un documento ya SUBIDO no vuelve a marcarse -> 409', con_clave('POST', f'/documentos/{did}/error', acc_oper, {'mensaje': 'x'}).status_code == 409)
+    r = llamar('GET', f'/documentos?tipo_entidad=RECEPCION_LECHE&id_entidad={rid}&estado_carga=SUBIDO', acc_oper).json()
+    chk('el listado filtra por entidad y estado', r['total'] >= 1 and any(i['id_documento'] == did for i in r['items']), str(r)[:200])
 
     seccion('10. Bloqueo por intentos y limite de frecuencia')
     u_blq = f't.blq.{SUF}'

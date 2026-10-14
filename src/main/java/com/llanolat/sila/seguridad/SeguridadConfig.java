@@ -71,7 +71,7 @@ public class SeguridadConfig {
                 .requestMatchers(HttpMethod.POST, "/api/v1/insumos/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/v1/insumos/**", "/api/v1/catalogos/productos/*/receta").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH, "/api/v1/insumos/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.POST, "/api/v1/acopio/precios", "/api/v1/acopio/pagos", "/api/v1/acopio/pagos/*/anular").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/v1/acopio/precios", "/api/v1/acopio/pagos", "/api/v1/acopio/pagos/*/anular", "/api/v1/finanzas/gastos/*/anular").hasRole("ADMIN")
                 .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                 .anyRequest().hasAuthority("TIPO_ACCESO"));
         return http.build();

@@ -54,7 +54,7 @@ public class ConsultaController {
         return operaciones.categoriasGasto(soloActivas);
     }
 
-    @GetMapping("/finanzas/gastos")
+    @GetMapping("/finanzas/gastos/por-categoria")
     public List<GastosPorCategoriaDto> gastos(@RequestParam(required = false) Long idPeriodo) {
         return operaciones.gastosPorCategoria(idPeriodo);
     }

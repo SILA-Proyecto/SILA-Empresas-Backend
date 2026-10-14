@@ -46,7 +46,7 @@ resultado del periodo) las resuelve la vista, no el backend.
 | GET | `/api/v1/facturas` | `estadoDian`, `idVenta` | vw_facturas |
 | GET | `/api/v1/facturacion/resoluciones` | `soloActivas` | vw_resoluciones_facturacion |
 | GET | `/api/v1/finanzas/categorias` | `soloActivas` | vw_categorias_gasto |
-| GET | `/api/v1/finanzas/gastos` | `idPeriodo` | vw_gastos_por_categoria |
+| GET | `/api/v1/finanzas/gastos/por-categoria` | `idPeriodo` | vw_gastos_por_categoria |
 | GET | `/api/v1/documentos/pendientes` | `estado` | vw_documentos_pendientes_carga |
 
 Las busquedas `?q=` son insensibles a mayusculas, tildes y enes: `?q=ordeno`
@@ -118,3 +118,14 @@ Contrato completo en `docs/CONTRATO_BACKEND.md` del dashboard («Insumos, receta
 | POST | `/api/v1/insumos/compras` · `/compras/{id}/anular` | ADMIN | sp_registrar_compra / sp_anular_compra |
 | POST | `/api/v1/insumos/ajustes` | OPERATIVO (restas) / ADMIN (correcciones) | sp_registrar_ajuste |
 | GET · PUT | `/api/v1/catalogos/productos/{id}/receta` | todos · ADMIN | `vw_recetas` / sp_definir_receta |
+
+## Gastos y documentos
+Contrato en el dashboard (`docs/CONTRATO_BACKEND.md`, «Gastos operativos y documentos»).
+| Método | Ruta | Rol | Qué hace |
+|---|---|---|---|
+| GET | `/api/v1/finanzas/gastos`, `/resumen`, `/{id}` | todos | lista paginada (vw_gastos), total filtrado y detalle |
+| POST | `/api/v1/finanzas/gastos` | OPERATIVO | pkg_finanzas.sp_registrar_gasto; Idempotency-Key obligatoria |
+| GET | `/api/v1/documentos`, `/{id}` | todos | lista paginada (vw_documentos) |
+| POST | `/api/v1/finanzas/gastos/{id}/anular` | ADMIN | pkg_finanzas.sp_anular_gasto (motivo 10+) |
+| POST | `/api/v1/documentos` | OPERATIVO | encola un documento PENDIENTE (pkg_documentos) |
+| POST | `/api/v1/documentos/{id}/subido` · `/error` | OPERATIVO | reporta el resultado de la subida a Drive |
