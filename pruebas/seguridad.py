@@ -553,6 +553,9 @@ try:
 
     # --- precio de la leche, pagos a lecheros y cuentas de la quincena
     per_act = llamar('GET', '/periodos/actual', acc_admin).json()
+    # el precio por defecto es un parametro que el usuario edita: se lee, no se asume
+    P = float(next(x for x in llamar('GET', '/parametros', acc_admin).json() if x['clave'] == 'PRECIO_LECHE_DEFAULT')['valor'])
+    V_ANT = round(100.5 * P, 2); V_TOT = round(V_ANT + 15000, 2); V_SAL = round(V_TOT - 100000, 2)
     chk('un OPERATIVO no fija precios -> 403', con_clave('POST', '/acopio/precios', acc_oper, {'id_proveedor': prov, 'precio_litro': 1500}).status_code == 403)
     r = con_clave('POST', '/acopio/precios', acc_admin, {'id_proveedor': prov, 'precio_litro': 1500})
     chk('ADMIN fija el precio por litro -> 201 y queda vigente', r.status_code == 201 and float(r.json()['precio_litro']) == 1500 and r.json()['vigente'] is True, r.text)
@@ -562,21 +565,21 @@ try:
     rech = llamar('GET', f'/acopio/recepciones?id_proveedor={prov}&estado_calidad=RECHAZADO', acc_oper).json()['items'][0]
     chk('la leche rechazada vale 0', float(rech['valor_total']) == 0, str(rech))
     ant = llamar('GET', f'/acopio/recepciones?id_proveedor={prov}&estado_calidad=APROBADO&sort=id_recepcion,asc', acc_oper).json()['items'][0]
-    chk('una recepcion anterior conserva su precio (el por defecto, 2000 -> 201000)', float(ant['precio_litro']) == 2000 and float(ant['valor_total']) == 201000, str(ant))
+    chk(f'una recepcion anterior conserva su precio (el por defecto del parametro, {P:g})', float(ant['precio_litro']) == P and abs(float(ant['valor_total']) - V_ANT) < 0.01, str(ant))
     pago = {'id_proveedor': prov, 'id_periodo_liquidado': per_act['id_periodo'], 'monto': 100000, 'metodo_pago': 'TRANSFERENCIA', 'referencia_pago': 'PRUEBA'}
     chk('un OPERATIVO no registra pagos -> 403', con_clave('POST', '/acopio/pagos', acc_oper, pago).status_code == 403)
     chk('pago sin Idempotency-Key -> 400', llamar('POST', '/acopio/pagos', acc_admin, pago).status_code == 400)
     r = con_clave('POST', '/acopio/pagos', acc_admin, pago)
     chk('ADMIN paga 100000 -> 201 VIGENTE', r.status_code == 201 and r.json()['estado'] == 'VIGENTE' and float(r.json()['monto']) == 100000, r.text)
     id_pago = r.json().get('id_pago')
-    r = con_clave('POST', '/acopio/pagos', acc_admin, {**pago, 'monto': 200000})
-    chk('pagar mas que el saldo (116000) -> rechazado', r.status_code in (400, 409, 422) and r.json().get('code') == 20005, r.text)
+    r = con_clave('POST', '/acopio/pagos', acc_admin, {**pago, 'monto': round(V_SAL + 1000, 2)})
+    chk('pagar mas que el saldo -> rechazado', r.status_code in (400, 409, 422) and r.json().get('code') == 20005, r.text)
     sp = next((x for x in llamar('GET', '/acopio/saldos?size=100', acc_admin).json()['items'] if x['id_proveedor'] == prov), {})
-    chk('saldo del lechero: comprado 216000 - pagado 100000 = 116000', float(sp.get('total_comprado', 0)) == 216000 and float(sp.get('total_pagado', 0)) == 100000 and float(sp.get('saldo', 0)) == 116000, str(sp))
+    chk('saldo del lechero: comprado - pagado 100000', abs(float(sp.get('total_comprado', 0)) - V_TOT) < 0.01 and float(sp.get('total_pagado', 0)) == 100000 and abs(float(sp.get('saldo', 0)) - V_SAL) < 0.01, str(sp))
     it = (llamar('GET', f"/acopio/pago-lecheros?id_proveedor={prov}", acc_oper).json().get('items') or [{}])[0]
-    chk('pago-lecheros trae valor, pagado y saldo de la quincena', float(it.get('valor_leche', 0)) == 216000 and float(it.get('valor_pagado', 0)) == 100000 and float(it.get('saldo', 0)) == 116000, str(it))
+    chk('pago-lecheros trae valor, pagado y saldo de la quincena', abs(float(it.get('valor_leche', 0)) - V_TOT) < 0.01 and float(it.get('valor_pagado', 0)) == 100000 and abs(float(it.get('saldo', 0)) - V_SAL) < 0.01, str(it))
     cu = llamar('GET', f"/periodos/{per_act['id_periodo']}", acc_oper).json()
-    chk('la quincena muestra leche comprada, pagada y por pagar', all(k in cu for k in ('leche_comprada', 'leche_pagada', 'leche_por_pagar', 'caja_neta', 'total_cobrado', 'total_vendido')) and float(cu['leche_comprada']) >= 216000 and float(cu['leche_pagada']) >= 100000, str(cu))
+    chk('la quincena muestra leche comprada, pagada y por pagar', all(k in cu for k in ('leche_comprada', 'leche_pagada', 'leche_por_pagar', 'caja_neta', 'total_cobrado', 'total_vendido')) and float(cu['leche_comprada']) >= V_TOT and float(cu['leche_pagada']) >= 100000, str(cu))
     chk('la quincena: por pagar = comprada - pagada', abs(float(cu['leche_por_pagar']) - (float(cu['leche_comprada']) - float(cu['leche_pagada']))) < 0.01)
     chk('un OPERATIVO no anula pagos -> 403', con_clave('POST', f'/acopio/pagos/{id_pago}/anular', acc_oper, {'motivo': 'Intento de un operativo'}).status_code == 403)
     r = con_clave('POST', f'/acopio/pagos/{id_pago}/anular', acc_admin, {'motivo': 'Pago de prueba anulado'})
@@ -584,7 +587,7 @@ try:
     r = con_clave('POST', f'/acopio/pagos/{id_pago}/anular', acc_admin, {'motivo': 'Segunda anulacion'})
     chk('anular dos veces -> 409', r.status_code == 409, r.text)
     sp = next((x for x in llamar('GET', '/acopio/saldos?size=100', acc_admin).json()['items'] if x['id_proveedor'] == prov), {})
-    chk('al anular, el saldo vuelve a 216000', float(sp.get('saldo', 0)) == 216000, str(sp))
+    chk('al anular, el saldo vuelve al total comprado', abs(float(sp.get('saldo', 0)) - V_TOT) < 0.01, str(sp))
     chk('el historial de precios lista el nuevo', llamar('GET', f'/acopio/precios?id_proveedor={prov}', acc_oper).json()['total'] == 1)
 
     sku = 'TP' + secrets.token_hex(4).upper()
@@ -968,7 +971,11 @@ try:
     n_m = 'Clave-Mfa-' + secrets.token_hex(5) + '!'
     acc_m = entrar_operativo(u_m, pw_m, n_m)
     sec_m = auth('/mfa/configurar', None, acc_m).json()['secreto']
+    t_ini = int(time.time())
     j = auth('/mfa/activar', {'codigo': totp(sec_m)}, acc_m).json()
+    if j.get('code') == 20013:   # diagnostico: ver si el secreto/paso de la prueba coinciden con lo que el servidor acepto
+        j['diag'] = {'secreto_len': len(sec_m), 'paso': t_ini // 30, 'ahora': int(time.time()) // 30,
+                     'codigos': [totp(sec_m, t_ini // 30 + d) for d in (-1, 0, 1)]}
     resp_m = j.get('codigos_respaldo', [])
     chk('usuario de prueba con MFA activo y codigos de respaldo', j.get('estado') == 'MFA_ACTIVADO' and len(resp_m) == 10, j)
     t_totp = auth('/login', {'usuario': u_m, 'clave': n_m}).json()['token_temporal']
