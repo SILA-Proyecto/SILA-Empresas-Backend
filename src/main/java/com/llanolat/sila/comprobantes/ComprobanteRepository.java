@@ -40,7 +40,7 @@ public class ComprobanteRepository {
 
     public Page<Comprobante> listar(String tipo, String sentido, String estado, Long idPeriodo, String texto,
                                     LocalDate desde, LocalDate hasta, Integer page, Integer size, String sort) {
-        Paginacion pag = Paginacion.de(page, size, sort, ORDEN, "fecha,desc", "numero");
+        Paginacion pag = Paginacion.de(page, size, sort, ORDEN, "fecha,desc", "tipo, id_documento");
         return paginada.consultar(COLUMNAS, "vw_comprobantes", filtro(tipo, sentido, estado, idPeriodo, texto, desde, hasta),
                 pag, Comprobante.class);
     }
@@ -49,19 +49,24 @@ public class ComprobanteRepository {
     public Resumen resumen(String tipo, String sentido, Long idPeriodo, String texto, LocalDate desde, LocalDate hasta) {
         return paginada.agregar("""
                 NVL(SUM(CASE WHEN sentido = 'INGRESO' AND afecta_caja = 1 THEN monto END), 0) AS ingresos,
-                NVL(SUM(CASE WHEN sentido = 'EGRESO' THEN monto END), 0) AS egresos,
+                NVL(SUM(CASE WHEN sentido = 'EGRESO' AND afecta_caja = 1 THEN monto END), 0) AS egresos,
                 NVL(SUM(CASE WHEN sentido = 'INGRESO' AND afecta_caja = 1 THEN monto END), 0)
-                  - NVL(SUM(CASE WHEN sentido = 'EGRESO' THEN monto END), 0) AS neto,
+                  - NVL(SUM(CASE WHEN sentido = 'EGRESO' AND afecta_caja = 1 THEN monto END), 0) AS neto,
                 COUNT(*) AS cantidad""", "vw_comprobantes", filtro(tipo, sentido, "VIGENTE", idPeriodo, texto, desde, hasta), Resumen.class);
     }
 
-    public Detalle detalle(String tipo, long id) {
+    private static String validarTipo(String tipo) {
         String t = tipo == null ? "" : tipo.trim().toUpperCase();
-        if (!TIPOS.contains(t)) throw SilaException.parametroInvalido("tipo debe ser uno de " + new java.util.TreeSet<>(TIPOS) + ".");
+        if (!TIPOS.contains(t)) throw SilaException.parametroInvalido("tipo debe ser uno de " + new java.util.TreeSet<>(TIPOS) + ".", "tipo");
+        return t;
+    }
+
+    public Detalle detalle(String tipo, long id) {
+        String t = validarTipo(tipo);
         Comprobante c = jdbc.sql("SELECT " + COLUMNAS + " FROM vw_comprobantes WHERE tipo = :t AND id_documento = :id")
                 .param("t", t).param("id", id).query(Comprobante.class).optional()
                 .orElseThrow(() -> SilaException.noEncontrado("El comprobante " + t + " #" + id + " no existe."));
-        return switch (t) {
+        Detalle d = switch (t) {
             case "VENTA" -> {
                 List<Linea> lineas = jdbc.sql("""
                         SELECT producto || ' (' || unidad_medida || ')' AS concepto, cantidad, precio_unitario AS valor_unitario,
@@ -83,8 +88,12 @@ public class ComprobanteRepository {
                     SELECT insumo || ' (' || unidad_medida || ')' AS concepto, cantidad, costo_unitario AS valor_unitario,
                            valor_total AS valor FROM vw_compras_insumo WHERE id_compra = :id""")
                     .param("id", id).query(Linea.class).list(), List.of(), null, null);
-            default -> new Detalle(c, List.of(new Linea(c.descripcion(), null, null, c.monto())), pagoUnico(c), null, null);
+            case "PAGO_LECHERO", "GASTO" -> new Detalle(c,
+                    List.of(new Linea(c.descripcion() == null ? c.numero() : c.descripcion(), null, null, c.monto())), pagoUnico(c), null, null);
+            default -> throw new IllegalStateException("Tipo de comprobante sin detalle: " + t);
         };
+        if (d.lineas().isEmpty()) throw new IllegalStateException("El comprobante " + c.numero() + " existe pero no tiene lineas.");
+        return d;
     }
 
     private static List<Pago> pagoUnico(Comprobante c) {
@@ -94,9 +103,7 @@ public class ComprobanteRepository {
     private static Filtro filtro(String tipo, String sentido, String estado, Long idPeriodo, String texto, LocalDate desde, LocalDate hasta) {
         Filtro f = new Filtro();
         if (tipo != null && !tipo.isBlank()) {
-            String t = tipo.trim().toUpperCase();
-            if (!TIPOS.contains(t)) throw SilaException.parametroInvalido("tipo debe ser uno de " + new java.util.TreeSet<>(TIPOS) + ".", "tipo");
-            f.cuando("tipo = :tipo").param("tipo", t);
+            f.cuando("tipo = :tipo").param("tipo", validarTipo(tipo));
         }
         if (sentido != null && !sentido.isBlank()) {
             String s = sentido.trim().toUpperCase();

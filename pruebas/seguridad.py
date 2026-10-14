@@ -894,10 +894,20 @@ try:
     lst = r.json().get('items', []) if r.status_code == 200 else []
     chk('lista de comprobantes -> 200 con numero tipo "VENTA #123"', r.status_code == 200 and lst and all(
         x['numero'] == f"{x['tipo']} #{x['id_documento']}" for x in lst), r.text[:300])
-    tipos = {x['tipo'] for x in lst}
-    chk('hay de varios tipos (venta, abono, pago a lechero, compra de insumos y gasto)', {'VENTA', 'ABONO', 'PAGO_LECHERO', 'COMPRA_INSUMO', 'GASTO'} <= tipos, str(tipos))
     chk('sentido: ventas y abonos INGRESO; pagos, compras y gastos EGRESO', all(
         (x['sentido'] == 'INGRESO') == (x['tipo'] in ('VENTA', 'ABONO')) for x in lst))
+    # un ejemplo de CADA tipo, pedido por filtro (no depende de que salgan entre los ultimos 100)
+    ejemplos = {}
+    for tp in ('VENTA', 'ABONO', 'PAGO_LECHERO', 'COMPRA_INSUMO', 'GASTO'):
+        rr = llamar('GET', f'/comprobantes?tipo={tp}&size=1', acc_oper)
+        ejemplos[tp] = (rr.json().get('items') or [None])[0] if rr.status_code == 200 else None
+        chk(f'hay al menos un comprobante {tp}', ejemplos[tp] is not None, rr.text[:200])
+    # el hasta incluye todo el dia (las ventas guardan hora)
+    f_venta = (ejemplos['VENTA'] or {}).get('fecha')
+    if f_venta:
+        rr = llamar('GET', f'/comprobantes?tipo=VENTA&desde={f_venta}&hasta={f_venta}&size=100', acc_oper)
+        chk('filtro desde=hasta=dia de una venta la incluye', rr.status_code == 200 and any(
+            x['id_documento'] == ejemplos['VENTA']['id_documento'] for x in rr.json()['items']), rr.text[:200])
     r = llamar('GET', '/comprobantes?tipo=GASTO&size=100', acc_oper)
     chk('filtro por tipo', r.status_code == 200 and r.json()['items'] and all(x['tipo'] == 'GASTO' for x in r.json()['items']), r.text[:200])
     chk('tipo invalido -> 400', llamar('GET', '/comprobantes?tipo=FACTURA', acc_oper).status_code == 400)
@@ -905,7 +915,7 @@ try:
     r = llamar('GET', '/comprobantes/resumen', acc_oper)
     chk('resumen: neto = ingresos - egresos', r.status_code == 200 and abs(num(r.json()['neto']) - (num(r.json()['ingresos']) - num(r.json()['egresos']))) < 0.01, r.text)
     for tp in ('VENTA', 'ABONO', 'PAGO_LECHERO', 'COMPRA_INSUMO', 'GASTO'):
-        ej = next((x for x in lst if x['tipo'] == tp), None)
+        ej = ejemplos.get(tp)
         if not ej: continue
         r = llamar('GET', f"/comprobantes/{tp}/{ej['id_documento']}", acc_oper)
         d = r.json() if r.status_code == 200 else {}
