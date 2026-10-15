@@ -129,3 +129,17 @@ Contrato en el dashboard (`docs/CONTRATO_BACKEND.md`, «Gastos operativos y docu
 | POST | `/api/v1/finanzas/gastos/{id}/anular` | ADMIN | pkg_finanzas.sp_anular_gasto (motivo 10+) |
 | POST | `/api/v1/documentos` | OPERATIVO | encola un documento PENDIENTE (pkg_documentos) |
 | POST | `/api/v1/documentos/{id}/subido` · `/error` | OPERATIVO | reporta el resultado de la subida a Drive |
+
+## Tablero
+
+| Método | Ruta | Rol | Qué hace |
+|---|---|---|---|
+| GET | `/api/v1/tablero` | todos | resumen de inicio en un solo JSON: hoy, quincena actual, cartera, inventario, lecheros, alertas y ventas de 7 días (lee vistas existentes, sin SQL nuevo) |
+
+## Passkeys (Face ID / huella)
+
+| Método | Ruta | Rol | Qué hace |
+|---|---|---|---|
+| POST | `/api/v1/auth/passkey/opciones` · `/passkey/verificar` | token temporal `mfa` | segundo factor con passkey (Yubico webauthn-server-core; pkg_passkeys.sp_usar) |
+| GET · DELETE | `/api/v1/auth/passkeys` · `/{id}` | todos | mis dispositivos (vw_passkeys) / pkg_passkeys.sp_quitar |
+| POST | `/api/v1/auth/passkeys/opciones` · `/passkeys` | todos (con segundo factor activo) | registrar un dispositivo: pide el código de la app; pkg_passkeys.sp_registrar |

@@ -66,6 +66,17 @@
 			<scope>runtime</scope>
 			<optional>true</optional>
 		</dependency>
+		<!-- Passkeys (WebAuthn): Face ID / huella como segundo factor -->
+		<dependency>
+			<groupId>com.yubico</groupId>
+			<artifactId>webauthn-server-core</artifactId>
+			<version>2.7.0</version>
+		</dependency>
+		<!-- Yubico usa Jackson 2 (el resto del backend, Jackson 3): sus firmas lo exponen al compilar -->
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-core</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>com.oracle.database.jdbc</groupId>
 			<artifactId>ojdbc17</artifactId>

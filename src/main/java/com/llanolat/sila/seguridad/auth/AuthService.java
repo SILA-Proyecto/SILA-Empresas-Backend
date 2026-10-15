@@ -65,11 +65,13 @@ class AuthService {
     private final SeguridadProps props;
     private final AccesoRegistrador acceso;
     private final VerificadorUsuario verificador;
+    private final PasskeyRepository passkeys;
+    private final WebAuthn webauthn;
     private final SecureRandom azar = new SecureRandom();
 
     AuthService(AuthRepository repo, PasswordService passwords, TokenService tokens, TotpService totp,
                 CifradoMfa cifrado, LimiteTasa limite, SeguridadProps props, AccesoRegistrador acceso,
-                VerificadorUsuario verificador) {
+                VerificadorUsuario verificador, PasskeyRepository passkeys, WebAuthn webauthn) {
         this.repo = repo;
         this.passwords = passwords;
         this.tokens = tokens;
@@ -79,6 +81,8 @@ class AuthService {
         this.props = props;
         this.acceso = acceso;
         this.verificador = verificador;
+        this.passkeys = passkeys;
+        this.webauthn = webauthn;
     }
 
     // ---------- login ----------
@@ -214,6 +218,77 @@ class AuthService {
         return repo.codigosRestantes(idDe(jwt));
     }
 
+    // ---------- passkeys (Face ID / huella) ----------
+
+    /** Paso MFA del login con passkey: opciones para navigator.credentials.get(). */
+    String opcionesPasskeyLogin(Jwt temporal, String origen) {
+        exigirAlgunTipo(temporal, Tipo.MFA);
+        Credencial cred = cargar(temporal);
+        limitarMfa(cred);
+        if (cred.bloqueado()) {
+            throw bloqueada(cred.bloqueadoMin());
+        }
+        if (!cred.mfaActivo() || !passkeys.tiene(cred.idUsuario())) {
+            throw SilaException.de(SilaException.ESTADO_INVALIDO, "No tiene Face ID / huella registrado. Use el codigo de su app.");
+        }
+        return webauthn.iniciarUso(origen, cred.idUsuario(), cred.usuario());
+    }
+
+    /** La firma del dispositivo reemplaza al codigo de 6 digitos. Un fallo cuenta igual que un codigo malo. */
+    Resultado verificarPasskey(Jwt temporal, String credencialJson, String origen, String ip, String userAgent) {
+        exigirAlgunTipo(temporal, Tipo.MFA);
+        Credencial cred = cargar(temporal);
+        limitarMfa(cred);
+        if (cred.bloqueado()) {
+            throw bloqueada(cred.bloqueadoMin());
+        }
+        if (!cred.mfaActivo()) {
+            throw SilaException.de(SilaException.AUTENTICACION, MSG_SESION);
+        }
+        WebAuthn.Uso uso = webauthn.terminarUso(origen, cred.idUsuario(), cred.usuario(), credencialJson);
+        if (uso == null) {
+            acceso.registrar(cred.usuario(), "PASSKEY_FALLIDA", ip, userAgent, null);
+            fallo(cred.usuario(), "MFA", ip, userAgent, "passkey");
+            throw SilaException.de(SilaException.AUTENTICACION, "No se pudo verificar Face ID / huella. Intente de nuevo o use el codigo.");
+        }
+        passkeys.usar(uso.credentialId(), uso.contador());
+        acceso.registrar(cred.usuario(), "PASSKEY_USADA", ip, userAgent, null);
+        return completarSiAlDia(cred, ip, userAgent);
+    }
+
+    /** Agregar un dispositivo es una accion sensible: pide el codigo de la app (o uno de respaldo). */
+    String opcionesPasskeyRegistro(Jwt jwt, String codigo, String origen, String ip, String userAgent) {
+        exigirAlgunTipo(jwt, Tipo.ACCESO);
+        Credencial cred = cargar(jwt);
+        exigirSegundoFactor(cred, codigo, ip, userAgent);
+        byte[] b = new byte[32];
+        azar.nextBytes(b);
+        String handle = passkeys.asegurarHandle(cred.idUsuario(), Base64.getUrlEncoder().withoutPadding().encodeToString(b));
+        return webauthn.iniciarRegistro(origen, cred.idUsuario(), cred.usuario(), cred.nombre(), handle);
+    }
+
+    PasskeyRepository.Passkey registrarPasskey(Jwt jwt, String nombre, String credencialJson, String origen, String ip, String userAgent) {
+        exigirAlgunTipo(jwt, Tipo.ACCESO);
+        Credencial cred = cargar(jwt);
+        WebAuthn.Registro r = webauthn.terminarRegistro(origen, cred.idUsuario(), credencialJson);
+        long id = passkeys.registrar(cred.idUsuario(), r.credentialId(), r.llave(), r.contador(), nombre, r.transportes());
+        acceso.registrar(cred.usuario(), "PASSKEY_REGISTRADA", ip, userAgent, nombre);
+        return passkeys.listar(cred.idUsuario()).stream().filter(p -> p.idPasskey() == id).findFirst().orElseThrow();
+    }
+
+    List<PasskeyRepository.Passkey> misPasskeys(Jwt jwt) {
+        exigirAlgunTipo(jwt, Tipo.ACCESO);
+        return passkeys.listar(idDe(jwt));
+    }
+
+    void quitarPasskey(Jwt jwt, long idPasskey, String ip, String userAgent) {
+        exigirAlgunTipo(jwt, Tipo.ACCESO);
+        if (passkeys.quitar(idDe(jwt), idPasskey) == 0) {
+            throw SilaException.noEncontrado("El dispositivo no existe.");
+        }
+        acceso.registrar(jwt.getSubject(), "PASSKEY_QUITADA", ip, userAgent, "id=" + idPasskey);
+    }
+
     // ---------- cambio de clave ----------
 
     Resultado cambiarClave(Jwt jwt, String claveActual, String claveNueva, String codigo, String ip, String userAgent) {
@@ -340,7 +415,8 @@ class AuthService {
 
     private Resultado temporal(Tipo tipo, String estado, Credencial cred) {
         String token = tokens.emitir(tipo, cred.idUsuario(), cred.usuario(), cred.rol());
-        return new Resultado(new AuthResponse(estado, null, null, token, null, null, null), null);
+        Boolean passkey = tipo == Tipo.MFA ? passkeys.tiene(cred.idUsuario()) : null;
+        return new Resultado(new AuthResponse(estado, null, null, token, null, null, null, passkey), null);
     }
 
     /**
@@ -366,7 +442,7 @@ class AuthService {
 
     private AuthResponse accesoDe(Credencial cred, String familia) {
         String token = tokens.emitir(Tipo.ACCESO, cred.idUsuario(), cred.usuario(), cred.rol(), familia);
-        return new AuthResponse("OK", token, tokens.segundosAcceso(), null, sesionDe(cred), null, null);
+        return new AuthResponse("OK", token, tokens.segundosAcceso(), null, sesionDe(cred), null, null, null);
     }
 
     private static UsuarioSesion sesionDe(Credencial c) {

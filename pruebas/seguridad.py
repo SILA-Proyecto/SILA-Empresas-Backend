@@ -13,7 +13,7 @@ No toca cuentas reales: crea usuarios temporales t.* directamente en Oracle (com
 por `docker exec`), y al final los desactiva. Quedan filas desactivadas y de auditoria (son inmutables).
 Requiere: python3 con `requests` y `bcrypt`, y el contenedor oracle-xe en marcha.
 """
-import argparse, base64, hashlib, hmac, os, secrets, struct, subprocess, sys, tempfile, time
+import argparse, base64, hashlib, hmac, json, os, secrets, struct, subprocess, sys, tempfile, time
 
 import bcrypt
 import requests
@@ -147,6 +147,58 @@ def entrar_tmp_operativo():
     u, t, n = f't.tmp.{secrets.token_hex(3)}', 'Tmp-' + secrets.token_urlsafe(9), 'Clave-Tmp-' + secrets.token_hex(5) + '!'
     crear_en_bd(u, 'OPERATIVO', t)
     return entrar_operativo(u, t, n)
+
+
+# ---------- autenticador WebAuthn por software (hace de telefono: llave P-256, atestacion "none") ----------
+def _cbor(v):
+    def cab(mayor, n):
+        if n < 24: return bytes([mayor << 5 | n])
+        for ai, ln in ((24, 1), (25, 2), (26, 4), (27, 8)):
+            if n < 1 << (8 * ln): return bytes([mayor << 5 | ai]) + n.to_bytes(ln, 'big')
+    if isinstance(v, int): return cab(0, v) if v >= 0 else cab(1, -1 - v)
+    if isinstance(v, bytes): return cab(2, len(v)) + v
+    if isinstance(v, str): b = v.encode(); return cab(3, len(b)) + b
+    if isinstance(v, dict): return cab(5, len(v)) + b''.join(_cbor(k) + _cbor(x) for k, x in v.items())
+    raise TypeError(type(v))
+
+
+def b64u(b): return base64.urlsafe_b64encode(b).rstrip(b'=').decode()
+def de_b64u(s): return base64.urlsafe_b64decode(s + '=' * (-len(s) % 4))
+
+
+class Autenticador:
+    def __init__(self):
+        from cryptography.hazmat.primitives.asymmetric import ec
+        self.llave = ec.generate_private_key(ec.SECP256R1())
+        self.cred_id = secrets.token_bytes(32)
+        self.contador = 0
+        self.handle = None
+
+    def crear(self, opciones, origen):
+        pk = opciones['publicKey']
+        self.handle = pk['user']['id']
+        nums = self.llave.public_key().public_numbers()
+        cose = _cbor({1: 2, 3: -7, -1: 1, -2: nums.x.to_bytes(32, 'big'), -3: nums.y.to_bytes(32, 'big')})
+        auth_data = (hashlib.sha256(pk['rp']['id'].encode()).digest() + bytes([0x45]) + (0).to_bytes(4, 'big')
+                     + bytes(16) + len(self.cred_id).to_bytes(2, 'big') + self.cred_id + cose)
+        cd = json.dumps({'type': 'webauthn.create', 'challenge': pk['challenge'], 'origin': origen, 'crossOrigin': False}).encode()
+        return {'id': b64u(self.cred_id), 'rawId': b64u(self.cred_id), 'type': 'public-key',
+                'response': {'clientDataJSON': b64u(cd), 'attestationObject': b64u(_cbor({'fmt': 'none', 'attStmt': {}, 'authData': auth_data})),
+                             'transports': ['internal']},
+                'clientExtensionResults': {}}
+
+    def firmar(self, opciones, origen, llave=None):
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import ec
+        pk = opciones['publicKey']
+        self.contador += 1
+        auth_data = hashlib.sha256(pk['rpId'].encode()).digest() + bytes([0x05]) + self.contador.to_bytes(4, 'big')
+        cd = json.dumps({'type': 'webauthn.get', 'challenge': pk['challenge'], 'origin': origen, 'crossOrigin': False}).encode()
+        firma = (llave or self.llave).sign(auth_data + hashlib.sha256(cd).digest(), ec.ECDSA(hashes.SHA256()))
+        return {'id': b64u(self.cred_id), 'rawId': b64u(self.cred_id), 'type': 'public-key',
+                'response': {'clientDataJSON': b64u(cd), 'authenticatorData': b64u(auth_data), 'signature': b64u(firma),
+                             'userHandle': self.handle},
+                'clientExtensionResults': {}}
 
 
 # =====================================================================
@@ -293,6 +345,51 @@ try:
     chk('cambiar clave con sesion abierta sin codigo -> 400', r.status_code == 400, r.text)
     chk('un OPERATIVO sin MFA no puede regenerar -> 409', llamar('POST', '/auth/mfa/respaldo/regenerar', entrar_tmp_operativo(), {'clave_actual': 'x', 'codigo': '123456'}).status_code in (401, 409))
 
+    seccion('5c. Passkeys (Face ID / huella) con un autenticador por software')
+    disp = Autenticador()
+    chk('pedir opciones de registro sin codigo -> 400', llamar('POST', '/auth/passkeys/opciones', acc_admin, {}).status_code == 400)
+    r = llamar('POST', '/auth/passkeys/opciones', acc_admin, {'codigo': nuevos[7]})
+    op = r.json() if r.status_code == 200 else {}
+    chk('opciones de registro: RP = host del origen, exige verificacion de usuario',
+        r.status_code == 200 and op['publicKey']['rp']['id'] == args.origin.split('://')[1].split(':')[0]
+        and op['publicKey']['authenticatorSelection']['userVerification'] == 'required', r.text[:300])
+    chk('origen ajeno -> 403', llamar('POST', '/auth/passkeys/opciones', acc_admin, {'codigo': nuevos[8]}, hdr={'Origin': 'http://evil.example'}).status_code == 403)
+    r = llamar('POST', '/auth/passkeys', acc_admin, {'nombre': 'Telefono de prueba', 'credencial': disp.crear(op, args.origin)})
+    chk('registrar el dispositivo -> 201', r.status_code == 201 and r.json().get('nombre') == 'Telefono de prueba', r.text[:300])
+    id_pk = r.json().get('id_passkey') if r.status_code == 201 else None
+    r = llamar('POST', '/auth/passkeys', acc_admin, {'nombre': 'Otra vez', 'credencial': disp.crear(op, args.origin)})
+    chk('el desafio de registro no sirve dos veces -> 409', r.status_code == 409, r.text[:200])
+    lst = llamar('GET', '/auth/passkeys', acc_admin).json()
+    chk('mis dispositivos: aparece, sin llave ni id de credencial', any(p['id_passkey'] == id_pk for p in lst)
+        and all('llave' not in str(p) and 'credential' not in str(p) for p in lst), str(lst)[:300])
+    j = auth('/login', {'usuario': U_ADMIN, 'clave': N_ADMIN}).json()
+    chk('login: MFA_REQUERIDO avisa passkey_disponible', j.get('estado') == 'MFA_REQUERIDO' and j.get('passkey_disponible') is True, j)
+    t_pk = j['token_temporal']
+    r = auth('/passkey/opciones', None, t_pk)
+    op = r.json() if r.status_code == 200 else {}
+    chk('opciones de inicio: el dispositivo esta en allowCredentials', r.status_code == 200
+        and any(c['id'] == b64u(disp.cred_id) for c in op['publicKey'].get('allowCredentials', [])), r.text[:300])
+    firmado = disp.firmar(op, args.origin)
+    r = auth('/passkey/verificar', {'credencial': firmado}, t_pk)
+    chk('firma valida -> OK con access_token y cookie', r.status_code == 200 and r.json().get('estado') == 'OK'
+        and r.json().get('access_token') and r.cookies.get('sila_refresh'), r.text[:300])
+    if r.status_code == 200: acc_admin = r.json()['access_token']
+    chk('repetir la misma firma (replay) -> 409', auth('/passkey/verificar', {'credencial': firmado}, t_pk).status_code == 409)
+    # despues del login valido (deja en 0 los intentos fallidos): una firma falsa cuenta como fallo
+    from cryptography.hazmat.primitives.asymmetric import ec as _ec
+    t_pk = auth('/login', {'usuario': U_ADMIN, 'clave': N_ADMIN}).json()['token_temporal']
+    op = auth('/passkey/opciones', None, t_pk).json()
+    r = auth('/passkey/verificar', {'credencial': disp.firmar(op, args.origin, llave=_ec.generate_private_key(_ec.SECP256R1()))}, t_pk)
+    chk('firma con otra llave -> 401', r.status_code == 401, r.text[:200])
+    chk('token de ACCESO no sirve en /passkey/verificar -> 403', auth('/passkey/verificar', {'credencial': firmado}, acc_admin).status_code == 403)
+    chk('un OPERATIVO sin segundo factor no puede registrar -> 409',
+        llamar('POST', '/auth/passkeys/opciones', entrar_tmp_operativo(), {'codigo': '123456'}).status_code == 409)
+    chk('quitar un dispositivo ajeno o inexistente -> 404', llamar('DELETE', '/auth/passkeys/999999999', acc_admin).status_code == 404)
+    chk('quitar mi dispositivo -> 204', llamar('DELETE', f'/auth/passkeys/{id_pk}', acc_admin).status_code == 204)
+    j = auth('/login', {'usuario': U_ADMIN, 'clave': N_ADMIN}).json()
+    chk('sin dispositivos: passkey_disponible false y opciones -> 409', j.get('passkey_disponible') is False
+        and auth('/passkey/opciones', None, j['token_temporal']).status_code == 409, j)
+
     seccion('6. OPERATIVO')
     acc_oper = entrar_operativo(U_OPER, T_OPER, N_OPER)
     chk('OPERATIVO entra sin MFA tras cambiar la clave', bool(acc_oper))
@@ -313,6 +410,11 @@ try:
         ('GET', '/ventas', None, {401}, {200}, {200}),
         ('GET', '/inventario', None, {401}, {200}, {200}),
         ('GET', '/notificaciones', None, {401}, {200}, {200}),
+        ('GET', '/tablero', None, {401}, {200}, {200}),
+        ('GET', '/auth/passkeys', None, {401}, {200}, {200}),
+        ('POST', '/auth/passkeys/opciones', {}, {401}, {400}, {400}),
+        ('DELETE', f'/auth/passkeys/{G}', None, {401}, {404}, {404}),
+        ('POST', '/auth/passkey/opciones', None, {401}, {403}, {403}),
         ('GET', '/comprobantes?size=1', None, {401}, {200}, {200}),
         ('GET', '/comprobantes/resumen', None, {401}, {200}, {200}),
         ('GET', f'/comprobantes/VENTA/{G}', None, {401}, {404}, {404}),
@@ -613,7 +715,7 @@ try:
     chk('stock final 37 (40 - 5 + 2)', float(llamar('GET', f'/inventario?texto={sku}', acc_oper).json()['items'][0]['stock_actual']) == 37)
     chk('listados de lotes y ajustes del producto', llamar('GET', f'/produccion/lotes?id_producto={prod}', acc_oper).json()['total'] == 1
         and llamar('GET', f'/produccion/ajustes?id_producto={prod}', acc_oper).json()['total'] == 2)
-    r = llamar('GET', '/inventario/alertas-caducidad?dias_maximos=30', acc_oper)
+    r = llamar('GET', '/inventario/alertas-caducidad?dias_maximos=30&size=100', acc_oper)
     chk('alertas con ventana de 30 dias incluyen el lote nuevo (vence en 21)', r.status_code == 200 and any(a['codigo_lote'] == lote['codigo_lote'] for a in r.json()['items']), r.text[:200])
     chk('alertas con la ventana normal (7 dias) NO lo incluyen', not any(a['codigo_lote'] == lote['codigo_lote'] for a in llamar('GET', '/inventario/alertas-caducidad', acc_oper).json()['items']))
     r = llamar('GET', '/inventario/resumen', acc_oper)
@@ -928,6 +1030,27 @@ try:
     chk('detalle inexistente -> 404', llamar('GET', f'/comprobantes/VENTA/{G}', acc_oper).status_code == 404)
     chk('detalle con tipo invalido -> 400', llamar('GET', '/comprobantes/XX/1', acc_oper).status_code == 400)
 
+    seccion('9i. Tablero (solo lectura, el OPERATIVO ve lo mismo que el ADMIN)')
+    r = llamar('GET', '/tablero', acc_oper)
+    t = r.json() if r.status_code == 200 else {}
+    chk('tablero -> 200 con todos los bloques', r.status_code == 200 and all(
+        k in t for k in ('fecha', 'hoy', 'quincena', 'cartera', 'inventario', 'lecheros', 'alertas', 'ventas_semana')), r.text[:300])
+    if t:
+        h, serie = t['hoy'], t['ventas_semana']
+        chk('caja neta de hoy = ingresos - egresos', abs(num(h['caja_neta']) - (num(h['caja_ingresos']) - num(h['caja_egresos']))) < 0.01, str(h))
+        chk('ventas de hoy = contado + credito', abs(num(h['ventas_total']) - (num(h['ventas_contado']) + num(h['ventas_credito']))) < 0.01, str(h))
+        chk('serie de 7 dias que termina hoy y su ultimo dia coincide con hoy', len(serie) == 7 and serie[-1]['fecha'] == t['fecha']
+            and abs(num(serie[-1]['total']) - num(h['ventas_total'])) < 0.01 and serie[-1]['cantidad'] == h['ventas_cantidad'], str(serie)[:300])
+        chk('a lo sumo 5 alertas principales y total = el de la campana', len(t['alertas']['principales']) <= 5
+            and t['alertas']['total'] == llamar('GET', '/notificaciones', acc_oper).json()['total'], str(t['alertas'])[:200])
+        q = t['quincena']
+        if q:
+            per = llamar('GET', f"/periodos?anio={q['anio']}&size=50", acc_admin).json()['items']
+            p = next((x for x in per if x['id_periodo'] == q['id_periodo']), {})
+            chk('resultado de la quincena = el de /periodos', p and abs(num(p['resultado_estimado']) - num(q['resultado_estimado'])) < 0.01, str(q)[:200])
+        ra = llamar('GET', '/tablero', acc_admin)
+        chk('ADMIN y OPERATIVO reciben las mismas cifras', ra.status_code == 200 and ra.json()['hoy'] == h and ra.json()['cartera'] == t['cartera'])
+
     seccion('10. Bloqueo por intentos y limite de frecuencia')
     u_blq = f't.blq.{SUF}'
     r = llamar('POST', '/usuarios', acc_admin, {'usuario': u_blq, 'nombre': 'Prueba Bloqueo', 'email': f'{u_blq}@example.com', 'rol': 'OPERATIVO'})
@@ -972,9 +1095,11 @@ try:
     acc_m = entrar_operativo(u_m, pw_m, n_m)
     sec_m = auth('/mfa/configurar', None, acc_m).json()['secreto']
     t_ini = int(time.time())
+    t0 = time.monotonic()
     j = auth('/mfa/activar', {'codigo': totp(sec_m)}, acc_m).json()
+    seg_activar = round(time.monotonic() - t0, 1)
     if j.get('code') == 20013:   # diagnostico: ver si el secreto/paso de la prueba coinciden con lo que el servidor acepto
-        j['diag'] = {'secreto_len': len(sec_m), 'paso': t_ini // 30, 'ahora': int(time.time()) // 30,
+        j['diag'] = {'secreto_len': len(sec_m), 'paso': t_ini // 30, 'ahora': int(time.time()) // 30, 'segundos_llamada': seg_activar,
                      'codigos': [totp(sec_m, t_ini // 30 + d) for d in (-1, 0, 1)]}
     resp_m = j.get('codigos_respaldo', [])
     chk('usuario de prueba con MFA activo y codigos de respaldo', j.get('estado') == 'MFA_ACTIVADO' and len(resp_m) == 10, j)

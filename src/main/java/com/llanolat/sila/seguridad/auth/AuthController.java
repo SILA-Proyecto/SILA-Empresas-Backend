@@ -14,6 +14,9 @@ import com.llanolat.sila.seguridad.auth.AuthDtos.SesionDto;
 import com.llanolat.sila.seguridad.auth.AuthDtos.SesionesCerradas;
 import com.llanolat.sila.seguridad.auth.AuthDtos.LoginRequest;
 import com.llanolat.sila.seguridad.auth.AuthDtos.MfaConfig;
+import com.llanolat.sila.seguridad.auth.AuthDtos.PasskeyOpcionesRequest;
+import com.llanolat.sila.seguridad.auth.AuthDtos.PasskeyRegistroRequest;
+import com.llanolat.sila.seguridad.auth.AuthDtos.PasskeyVerificarRequest;
 import com.llanolat.sila.seguridad.auth.AuthDtos.UsuarioSesion;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -23,6 +26,7 @@ import java.util.Arrays;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -123,6 +127,51 @@ class AuthController {
         verificarOrigen(req);
         service.cerrarSesion(cookie, ip(req), agente(req));
         return ResponseEntity.noContent().header(HttpHeaders.SET_COOKIE, borrarCookie().toString()).build();
+    }
+
+    // ---------- passkeys (Face ID / huella) ----------
+    // Las opciones salen tal cual las arma la biblioteca ({"publicKey": {...}}, camelCase del estandar WebAuthn).
+
+    /** Token temporal "mfa": opciones para navigator.credentials.get(). */
+    @PostMapping(value = "/passkey/opciones", produces = MediaType.APPLICATION_JSON_VALUE)
+    ResponseEntity<String> opcionesPasskeyLogin(@AuthenticationPrincipal Jwt jwt, HttpServletRequest req) {
+        return json(service.opcionesPasskeyLogin(jwt, req.getHeader("Origin")));
+    }
+
+    /** Token temporal "mfa": entra con la firma del dispositivo en lugar del codigo de 6 digitos. */
+    @PostMapping("/passkey/verificar")
+    ResponseEntity<AuthResponse> verificarPasskey(@AuthenticationPrincipal Jwt jwt,
+                                                  @Valid @RequestBody PasskeyVerificarRequest r, HttpServletRequest req) {
+        return responder(service.verificarPasskey(jwt, r.credencial().toString(), req.getHeader("Origin"), ip(req), agente(req)));
+    }
+
+    @GetMapping("/passkeys")
+    List<PasskeyRepository.Passkey> passkeys(@AuthenticationPrincipal Jwt jwt) {
+        return service.misPasskeys(jwt);
+    }
+
+    /** Token de acceso + codigo del segundo factor: opciones para navigator.credentials.create(). */
+    @PostMapping(value = "/passkeys/opciones", produces = MediaType.APPLICATION_JSON_VALUE)
+    ResponseEntity<String> opcionesPasskeyRegistro(@AuthenticationPrincipal Jwt jwt,
+                                                   @Valid @RequestBody PasskeyOpcionesRequest r, HttpServletRequest req) {
+        return json(service.opcionesPasskeyRegistro(jwt, r.codigo(), req.getHeader("Origin"), ip(req), agente(req)));
+    }
+
+    @PostMapping("/passkeys")
+    ResponseEntity<PasskeyRepository.Passkey> registrarPasskey(@AuthenticationPrincipal Jwt jwt,
+                                                               @Valid @RequestBody PasskeyRegistroRequest r, HttpServletRequest req) {
+        return ResponseEntity.status(201).body(service.registrarPasskey(jwt, r.nombre(), r.credencial().toString(),
+                req.getHeader("Origin"), ip(req), agente(req)));
+    }
+
+    @DeleteMapping("/passkeys/{id}")
+    ResponseEntity<Void> quitarPasskey(@AuthenticationPrincipal Jwt jwt, @PathVariable long id, HttpServletRequest req) {
+        service.quitarPasskey(jwt, id, ip(req), agente(req));
+        return ResponseEntity.noContent().build();
+    }
+
+    private static ResponseEntity<String> json(String cuerpo) {
+        return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store").contentType(MediaType.APPLICATION_JSON).body(cuerpo);
     }
 
     // ---------- mis sesiones ----------

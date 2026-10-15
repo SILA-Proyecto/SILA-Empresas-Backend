@@ -52,7 +52,8 @@ public class SeguridadConfig {
         http.authorizeHttpRequests(a -> a
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers(HttpMethod.POST, AUTH + "/login", AUTH + "/refresh", AUTH + "/logout").permitAll()
-                .requestMatchers(HttpMethod.POST, AUTH + "/mfa/verificar", AUTH + "/mfa/respaldo").hasAuthority("TIPO_MFA")
+                .requestMatchers(HttpMethod.POST, AUTH + "/mfa/verificar", AUTH + "/mfa/respaldo",
+                                 AUTH + "/passkey/opciones", AUTH + "/passkey/verificar").hasAuthority("TIPO_MFA")
                 .requestMatchers(HttpMethod.POST, AUTH + "/mfa/configurar", AUTH + "/mfa/activar")
                     .hasAnyAuthority("TIPO_MFA_ENROLAR", "TIPO_ACCESO")
                 .requestMatchers(HttpMethod.POST, AUTH + "/cambiar-clave")
