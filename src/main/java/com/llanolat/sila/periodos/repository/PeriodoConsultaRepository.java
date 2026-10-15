@@ -2,6 +2,7 @@ package com.llanolat.sila.periodos.repository;
 
 import com.llanolat.sila.infra.ConsultaPaginada;
 import com.llanolat.sila.infra.ConsultaPaginada.Filtro;
+import com.llanolat.sila.infra.Fechas;
 import com.llanolat.sila.infra.Page;
 import com.llanolat.sila.infra.Paginacion;
 import com.llanolat.sila.infra.SilaException;
@@ -64,10 +65,11 @@ public class PeriodoConsultaRepository {
                    .param("id", id).query(PeriodoDto.class).optional();
     }
 
-    /** La quincena que contiene el dia de hoy, si existe. */
+    /** La quincena que contiene el dia de hoy en Colombia (la base esta en UTC), si existe. */
     public Optional<PeriodoDto> actual() {
         return jdbc.sql("SELECT " + COLUMNAS + " FROM " + VISTA
-                      + " WHERE TRUNC(SYSDATE) BETWEEN e.fecha_inicio AND e.fecha_fin")
+                      + " WHERE :hoy BETWEEN e.fecha_inicio AND e.fecha_fin")
+                   .param("hoy", Fechas.hoy())
                    .query(PeriodoDto.class).optional();
     }
 
