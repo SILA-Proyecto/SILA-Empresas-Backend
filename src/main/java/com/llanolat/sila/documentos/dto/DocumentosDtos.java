@@ -25,7 +25,7 @@ public final class DocumentosDtos {
             LocalDateTime fechaCarga
     ) {}
 
-    /** tipo_entidad: RECEPCION_LECHE (la base verifica que la entidad exista; FACTURA y NOTA_CREDITO se retiraron con la DIAN). mime_type por defecto application/pdf. */
+    /** tipo_entidad: FACTURA, NOTA_CREDITO o RECEPCION_LECHE (la base verifica que la entidad exista). mime_type por defecto application/pdf. */
     public record RegistrarDocumentoRequest(
             @NotBlank String tipoEntidad,
             @NotNull Long idEntidad,

@@ -70,7 +70,7 @@ public class VentaRepository {
         });
     }
 
-    /** ADMIN. Devuelve el stock y la deuda; la base lo rechaza si hay abonos. */
+    /** ADMIN. Devuelve el stock y la deuda; la base lo rechaza si hay abonos o una factura enviada. */
     public void anular(long idVenta, String motivo) {
         sila.ejecutar(c -> {
             try (CallableStatement s = c.prepareCall("{call pkg_ventas.sp_anular_venta(?,?)}")) {

@@ -2,7 +2,9 @@ package com.llanolat.sila.consultas.repository;
 
 import com.llanolat.sila.consultas.dto.CategoriasGastoDto;
 import com.llanolat.sila.consultas.dto.DocumentosPendientesCargaDto;
+import com.llanolat.sila.consultas.dto.FacturasDto;
 import com.llanolat.sila.consultas.dto.GastosPorCategoriaDto;
+import com.llanolat.sila.consultas.dto.ResolucionesFacturacionDto;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -22,6 +24,36 @@ public class OperacionConsultaRepository {
     private final JdbcClient jdbc;
 
     public OperacionConsultaRepository(JdbcClient jdbc) { this.jdbc = jdbc; }
+
+    // ---------- facturacion ----------
+
+    public List<FacturasDto> facturas(String estadoDian, Long idVenta) {
+        var sql = new StringBuilder("""
+                SELECT id_factura, id_venta, numero_factura, fecha_emision,
+                       fecha_vencimiento, subtotal_base, total_iva, total_factura,
+                       cufe, qr_code_url, estado_dian, usuario_emisor
+                  FROM vw_facturas WHERE 1 = 1
+                """);
+        if (estadoDian != null && !estadoDian.isBlank()) sql.append(" AND estado_dian = :estado");
+        if (idVenta != null) sql.append(" AND id_venta = :idVenta");
+        sql.append(" ORDER BY fecha_emision DESC, id_factura DESC");
+
+        var spec = jdbc.sql(sql.toString());
+        if (estadoDian != null && !estadoDian.isBlank()) spec = spec.param("estado", estadoDian.toUpperCase());
+        if (idVenta != null) spec = spec.param("idVenta", idVenta);
+        return spec.query(FacturasDto.class).list();
+    }
+
+    public List<ResolucionesFacturacionDto> resoluciones(boolean soloActivas) {
+        return jdbc.sql("""
+                SELECT id_resolucion, tipo_documento, numero_resolucion, prefijo,
+                       rango_desde, rango_hasta, consecutivo_actual, vigente_desde,
+                       vigente_hasta, activa
+                  FROM vw_resoluciones_facturacion
+                """ + (soloActivas ? " WHERE activa = 1" : "")
+                    + " ORDER BY tipo_documento, vigente_desde DESC")
+                .query(ResolucionesFacturacionDto.class).list();
+    }
 
     // ---------- finanzas ----------
 

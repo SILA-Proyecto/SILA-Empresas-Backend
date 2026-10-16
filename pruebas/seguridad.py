@@ -421,6 +421,7 @@ try:
         ('GET', '/comprobantes/resumen', None, {401}, {200}, {200}),
         ('GET', f'/comprobantes/VENTA/{G}', None, {401}, {404}, {404}),
         ('PATCH', f'/catalogos/productos/{G}/stock-minimo', {'stock_minimo': 1}, {401}, {403}, {404}),
+        ('GET', '/facturas', None, {401}, {200}, {200}),
         ('GET', '/finanzas/categorias', None, {401}, {200}, {200}),
         ('POST', '/catalogos/clientes', {}, {401}, {400}, {400}),
         ('POST', '/catalogos/proveedores', {}, {401}, {400}, {400}),
@@ -584,7 +585,7 @@ try:
     chk('otra clave, mismo documento -> 409 (duplicado real, no se oculta)', r4.status_code == 409, r4.text)
     chk('clave con formato invalido -> 400', llamar('POST', '/catalogos/clientes', acc_admin, cuerpo, hdr={'Idempotency-Key': 'corta'}).status_code == 400)
     r5 = llamar('POST', '/ventas', acc_admin, {}, hdr={})
-    chk('rutas de ventas/cartera EXIGEN la clave -> 400', r5.status_code == 400 and 'Idempotency-Key' in r5.text, r5.text)
+    chk('rutas de ventas/cartera/facturacion EXIGEN la clave -> 400', r5.status_code == 400 and 'Idempotency-Key' in r5.text, r5.text)
     r6 = llamar('POST', '/catalogos/clientes', acc_oper, cuerpo, hdr={'Idempotency-Key': clave})
     chk('la clave es por usuario: otro usuario no recibe la respuesta ajena (no es 2xx repetido)',
         r6.headers.get('Idempotency-Replayed') != 'true', r6.text)
