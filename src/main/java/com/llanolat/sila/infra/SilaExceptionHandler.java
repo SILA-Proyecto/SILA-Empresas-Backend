@@ -34,6 +34,8 @@ public class SilaExceptionHandler {
             case SilaException.CUENTA_BLOQUEADA          -> HttpStatus.LOCKED;        // 423
             case SilaException.DEMASIADOS_INTENTOS       -> HttpStatus.TOO_MANY_REQUESTS; // 429
             case SilaException.ENTIDAD_NO_EXISTE         -> HttpStatus.NOT_FOUND;     // 404
+            case SilaException.ARCHIVO_RECHAZADO         -> HttpStatus.UNPROCESSABLE_CONTENT; // 422
+            case SilaException.SERVICIO_NO_DISPONIBLE    -> HttpStatus.SERVICE_UNAVAILABLE;   // 503
             case SilaException.STOCK_INSUFICIENTE,
                  SilaException.LIMITE_CREDITO,
                  SilaException.PERIODO_CERRADO,
@@ -63,6 +65,13 @@ public class SilaExceptionHandler {
          .forEach(fe -> campos.putIfAbsent(nombreJson(fe.getField()), fe.getDefaultMessage()));
         return ResponseEntity.badRequest()
                 .body(ErrorDto.validacion("Hay campos invalidos en la solicitud.", campos));
+    }
+
+    /** Un archivo (o la solicitud completa) supera el limite de subida. */
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorDto> archivoGrande(Exception e) {
+        return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).body(ErrorDto.deNegocio(
+                SilaException.ARCHIVO_RECHAZADO, "El archivo supera el tamano maximo permitido (10 MB).", null));
     }
 
     /** JSON mal formado, tipo equivocado o id no numerico en la ruta: mismo formato de error. */

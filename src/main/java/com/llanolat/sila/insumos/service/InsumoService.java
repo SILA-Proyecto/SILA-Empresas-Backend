@@ -16,7 +16,12 @@ public class InsumoService {
 
     private final InsumoRepository repo;
 
-    public InsumoService(InsumoRepository repo) { this.repo = repo; }
+    private final com.llanolat.sila.archivos.ComprobanteArchivos archivos;
+
+    public InsumoService(InsumoRepository repo, com.llanolat.sila.archivos.ComprobanteArchivos archivos) {
+        this.repo = repo;
+        this.archivos = archivos;
+    }
 
     // ---------- insumos ----------
 
@@ -43,12 +48,14 @@ public class InsumoService {
     public Compra comprar(CrearCompraRequest r) {
         LocalDate fecha = Fechas.deOHoy(r.fecha(), "fecha");
         long id = repo.registrarCompra(r, fecha);
+        archivos.alRegistrar("COMPRA_INSUMO", id);
         return repo.compra(id).orElseThrow(() -> SilaException.noEncontrado("La compra no existe."));
     }
 
     public Compra anularCompra(long id, String motivo) {
         repo.compra(id).orElseThrow(() -> SilaException.noEncontrado("La compra " + id + " no existe."));
         repo.anularCompra(id, motivo.trim());
+        archivos.alAnular("COMPRA_INSUMO", id);
         return repo.compra(id).orElseThrow();
     }
 

@@ -33,6 +33,8 @@ public class SilaException extends RuntimeException {
     public static final int DEMASIADOS_INTENTOS    = 20015;  // limite de frecuencia -> 429
     public static final int IDEMPOTENCIA_EN_CURSO  = 20016;  // misma Idempotency-Key aun en proceso -> 409
     public static final int IDEMPOTENCIA_DISTINTA  = 20017;  // misma clave con otro contenido -> 422
+    public static final int ARCHIVO_RECHAZADO      = 20018;  // el contenido de un archivo subido no se admite -> 422
+    public static final int SERVICIO_NO_DISPONIBLE = 20019;  // antivirus o Drive no responden / no estan conectados -> 503
     public static final int ERROR_INTERNO          = 20999;
 
     /** "ORA-20003: La venta excede el cupo..." -> deja solo el texto. */

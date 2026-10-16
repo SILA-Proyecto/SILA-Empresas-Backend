@@ -8,6 +8,10 @@ CRED="$HOME/sila_llanolat/credenciales.txt"
 export LLANOLAT_APP_PWD="$(awk '/^LLANOLAT_APP/{print $2}' "$CRED")"
 export SILA_JWT_SECRET="$(awk '/^SILA_JWT_SECRET/{print $2}' "$CRED")"
 export SILA_MFA_KEY="$(awk '/^SILA_MFA_KEY/{print $2}' "$CRED")"
+export SILA_DOCS_KEY="$(awk '/^SILA_DOCS_KEY/{print $2}' "$CRED")"
+# Antivirus: en desarrollo no hay clamd, asi que por defecto queda APAGADO (las subidas no se escanean). El perfil de
+# produccion se niega a arrancar con el antivirus apagado. Para probarlo: SILA_CLAMAV=true ./arrancar.sh (clamd en :3310).
+export SILA_CLAMAV="${SILA_CLAMAV:-false}"
 export SILA_MODO="${1:-jwt}"
 # En http://localhost la cookie no puede ser Secure en todos los navegadores; en produccion (HTTPS) siempre true.
 export SILA_COOKIE_SECURE="${SILA_COOKIE_SECURE:-false}"

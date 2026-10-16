@@ -60,7 +60,8 @@ public class IdempotenciaFilter extends OncePerRequestFilter {
         return !METODOS.contains(req.getMethod())
                 || !ruta.startsWith("/api/v1/")
                 || ruta.startsWith("/api/v1/auth")
-                || ruta.startsWith("/api/v1/usuarios");
+                || ruta.startsWith("/api/v1/usuarios")
+                || ruta.startsWith("/api/v1/archivos");   // cuerpos y respuestas binarios: no caben en la tabla de idempotencia
     }
 
     @Override

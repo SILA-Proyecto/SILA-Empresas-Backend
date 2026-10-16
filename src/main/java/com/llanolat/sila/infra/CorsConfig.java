@@ -35,6 +35,8 @@ public class CorsConfig {
         c.setAllowedOrigins(Arrays.asList(origenes));
         c.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         c.setAllowedHeaders(cabeceras);
+        // Descargas de archivos: nombre del archivo y, en la clave aleatoria, la clave generada (se muestra una vez).
+        c.setExposedHeaders(List.of("Content-Disposition", "X-Clave-Generada", "X-Archivo-Id", "X-Archivo-Nombre"));
         c.setAllowCredentials(true);
         c.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource fuente = new UrlBasedCorsConfigurationSource();

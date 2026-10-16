@@ -52,9 +52,15 @@ public class SilaTemplate {
               + "sila.seguridad.modo=desarrollo en application.yml, o registre un "
               + "bean que lea el usuario y el rol del JWT.");
         });
-        String usuario = id.usuario();
-        String rol = id.rol();
+        return ejecutarComo(id.usuario(), id.rol(), operacion);
+    }
 
+    /**
+     * Igual que {@link #ejecutar}, pero con la identidad dada. Es para los procesos que corren sin peticion HTTP
+     * (reintento de PDF, envio a Drive): la base solo exige un usuario con formato valido y un rol, y deja ese
+     * usuario en el registro, asi que van con una identidad de sistema reconocible (p. ej. 'sistema.drive').
+     */
+    public <T> T ejecutarComo(String usuario, String rol, Operacion<T> operacion) {
         try (Connection c = dataSource.getConnection()) {
             iniciarSesion(c, usuario, rol);
             try {

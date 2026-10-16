@@ -22,6 +22,12 @@ spring:
       connection-timeout: 10000
       pool-name: sila-pool
 
+  servlet:
+    multipart:
+      # Archivos subidos por el ADMIN: 10 MB de contenido (el cifrado de Drive agrega ~65 bytes, de ahi los 11 MB).
+      max-file-size: 11MB
+      max-request-size: 12MB
+
 server:
   # Solo esta maquina por defecto. Para probar desde otro equipo: SILA_BIND=0.0.0.0 (y nunca en produccion sin proxy y firewall).
   address: ${SILA_BIND:127.0.0.1}
@@ -61,3 +67,29 @@ sila:
   cors:
     # Origenes permitidos (separados por coma). ng serve usa :4200.
     origenes: http://localhost:4200
+  archivos:
+    # Archivos CIFRADOS (comprobantes en PDF y lo que sube el ADMIN). Fuera de cualquier carpeta que sirva un servidor web.
+    directorio: ${SILA_DOCS_DIR:${user.home}/sila_docs}
+    # Llave AES-256 (base64, 32 bytes) de los archivos y del acceso a Drive. DISTINTA de SILA_MFA_KEY. Si se pierde, los
+    # archivos (tambien los de Drive) no se pueden leer: guardar una copia FUERA del servidor.
+    docs-key: ${SILA_DOCS_KEY:}
+    # Los movimientos de esta fecha en adelante reciben PDF si les falta (reintento automatico). Vacio = apagado.
+    fecha-corte: ${SILA_DOCS_FECHA_CORTE:}
+    empresa:
+      nombre: ${SILA_EMPRESA_NOMBRE:LLANOLAT}
+      nit: ${SILA_EMPRESA_NIT:}
+      direccion: ${SILA_EMPRESA_DIRECCION:}
+      telefono: ${SILA_EMPRESA_TELEFONO:}
+    clamav:
+      # Antivirus ClamAV (clamd). Habilitado = la subida se rechaza si clamd no responde. Apagarlo SOLO en desarrollo.
+      habilitado: ${SILA_CLAMAV:true}
+      host: ${SILA_CLAMAV_HOST:127.0.0.1}
+      puerto: ${SILA_CLAMAV_PUERTO:3310}
+      socket: ${SILA_CLAMAV_SOCKET:}
+    drive:
+      client-id: ${SILA_DRIVE_CLIENT_ID:}
+      client-secret: ${SILA_DRIVE_CLIENT_SECRET:}
+      # Debe coincidir EXACTO con el URI de redireccion registrado en Google Cloud (OAuth, aplicacion web).
+      redirect-uri: ${SILA_DRIVE_REDIRECT_URI:}
+      # Pagina del dashboard a la que se vuelve al terminar (opcional): se le agrega ?drive=ok o ?drive=error
+      retorno: ${SILA_DRIVE_RETORNO:}

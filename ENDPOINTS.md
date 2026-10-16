@@ -143,3 +143,26 @@ Contrato en el dashboard (`docs/CONTRATO_BACKEND.md`, «Gastos operativos y docu
 | POST | `/api/v1/auth/passkey/opciones` · `/passkey/verificar` | token temporal `mfa` | segundo factor con passkey (Yubico webauthn-server-core; pkg_passkeys.sp_usar) |
 | GET · DELETE | `/api/v1/auth/passkeys` · `/{id}` | todos | mis dispositivos (vw_passkeys) / pkg_passkeys.sp_quitar |
 | POST | `/api/v1/auth/passkeys/opciones` · `/passkeys` | todos (con segundo factor activo) | registrar un dispositivo: pide el código de la app; pkg_passkeys.sp_registrar |
+
+## Archivos (PDF de comprobantes, archivos del ADMIN, carpetas, Drive)
+Contrato en el dashboard (`docs/CONTRATO_BACKEND.md`, «Archivos»). SQL: `~/sila_llanolat/22_archivos.sql` (`pkg_archivos`, `carpetas_archivos`, `accesos_documentos`, vistas `vw_archivos*`). Código: `com.llanolat.sila.archivos`. **Sin Idempotency-Key** en estas rutas. Archivos cifrados AES-256-GCM en `SILA_DOCS_DIR`; copia cifrada en Drive; ClamAV antes de aceptar una subida (falla cerrado).
+
+| Método | Ruta | Rol | Qué hace |
+|---|---|---|---|
+| GET | `/api/v1/archivos` | todos | lista paginada plana (vw_archivos): `origen`, `tipo`, `version`, `archivado`, `estado_drive`, `id_carpeta`, `texto`, `desde`, `hasta` |
+| GET | `/api/v1/archivos/explorador` | todos | carpetas virtuales (TIPO, CLIENTE, PROVEEDOR; vw_archivos_ubicaciones) y manuales (MANUAL): `arbol` + `ruta` repetida |
+| GET | `/api/v1/archivos/comprobante/{tipo}/{id}` | todos | los PDF de un comprobante (`[]`, original, original + anulado) |
+| GET | `/api/v1/archivos/{id}` · `/opciones-descarga` | todos | detalle · qué claves admite (documento de identidad, escrita, aleatoria) |
+| GET | `/api/v1/archivos/{id}/contenido` | todos | ver el archivo (bitácora VER) |
+| POST | `/api/v1/archivos/{id}/descarga` | todos | copia PDF protegida con clave (AES-256); clave aleatoria en `X-Clave-Generada` (bitácora DESCARGAR + tipo de clave) |
+| POST | `/api/v1/archivos/descifrar` | todos | multipart `archivo`: descifra un `.sila` bajado de Drive («Ver documento») |
+| GET | `/api/v1/archivos/carpetas` | todos | carpetas manuales hijas de `id_padre` |
+| POST | `/api/v1/archivos` | ADMIN | multipart `archivo` + `id_carpeta`: tipo real, ≤ 10 MB, ClamAV, revisión de PDF / re-codificado de imagen, cifrado; pkg_archivos.sp_registrar_subida |
+| POST | `/api/v1/archivos/{id}/archivar` | ADMIN | pkg_archivos.sp_archivar_documento (motivo 5–255); nunca borra; no aplica a comprobantes |
+| POST | `/api/v1/archivos/carpetas` · `/carpetas/{id}/archivar` | ADMIN | pkg_archivos.sp_crear_carpeta / sp_archivar_carpeta |
+| GET | `/api/v1/archivos/accesos` | ADMIN | bitácora de accesos (vw_accesos_documentos) |
+| GET | `/api/v1/archivos/drive/estado` · `/autorizar` | ADMIN | estado de la copia en Drive · URL de Google para conectar (OAuth `drive.file`) |
+| GET | `/api/v1/archivos/drive/callback` | público (state firmado, un solo uso) | vuelta de Google; redirige a `SILA_DRIVE_RETORNO?drive=ok\|error` |
+| POST | `/api/v1/archivos/drive/sincronizar` · `/desconectar` | ADMIN | envía lo pendiente ahora · borra el acceso guardado |
+
+Los PDF de comprobantes NO tienen endpoint de escritura: `ComprobanteArchivos` los genera dentro de la propia petición de registro/anulación de VENTA, ABONO, PAGO_LECHERO, COMPRA_INSUMO y GASTO (si falla, el movimiento ya está guardado y un reintento cada 2 min lo repone desde `SILA_DOCS_FECHA_CORTE`). Errores nuevos: `20018` (422 contenido no admitido / 413 tamaño) y `20019` (503 antivirus o Drive no disponibles).

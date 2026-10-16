@@ -3,9 +3,9 @@ package com.llanolat.sila.seguridad;
 import java.util.Base64;
 
 /** Lectura de las claves que llegan en base64 por variable de entorno. */
-final class Claves {
+public final class Claves {
 
-    static byte[] decodificar(String valor, String variable, int minimoBytes) {
+    public static byte[] decodificar(String valor, String variable, int minimoBytes) {
         if (valor == null || valor.isBlank()) {
             throw new IllegalStateException("Falta la variable de entorno " + variable
                     + ". Cargue las claves con ./arrancar.sh (lee ~/sila_llanolat/credenciales.txt).");

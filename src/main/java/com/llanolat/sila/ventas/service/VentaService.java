@@ -21,7 +21,12 @@ public class VentaService {
 
     private final VentaRepository repo;
 
-    public VentaService(VentaRepository repo) { this.repo = repo; }
+    private final com.llanolat.sila.archivos.ComprobanteArchivos archivos;
+
+    public VentaService(VentaRepository repo, com.llanolat.sila.archivos.ComprobanteArchivos archivos) {
+        this.repo = repo;
+        this.archivos = archivos;
+    }
 
     public VentaDetalle registrar(CrearVentaRequest r) {
         boolean contado = "CONTADO".equals(r.tipoVenta());
@@ -33,12 +38,14 @@ public class VentaService {
             throw SilaException.parametroInvalido("Una venta a credito no lleva pagos: el cobro se registra como abono en Cartera.", "pagos");
         }
         long id = repo.registrar(r.idCliente(), r.tipoVenta(), lineasJson(r.lineas()), contado ? pagosJson(pagos) : null);
+        archivos.alRegistrar("VENTA", id);
         return detalle(id);
     }
 
     public VentaDetalle anular(long id, String motivo) {
         detalle(id);   // 404 claro si no existe
         repo.anular(id, motivo.trim());
+        archivos.alAnular("VENTA", id);
         return detalle(id);
     }
 

@@ -18,7 +18,12 @@ public class AcopioService {
 
     private final AcopioRepository repo;
 
-    public AcopioService(AcopioRepository repo) { this.repo = repo; }
+    private final com.llanolat.sila.archivos.ComprobanteArchivos archivos;
+
+    public AcopioService(AcopioRepository repo, com.llanolat.sila.archivos.ComprobanteArchivos archivos) {
+        this.repo = repo;
+        this.archivos = archivos;
+    }
 
     public RecepcionDto registrar(RegistrarRecepcionRequest r) {
         // Siempre se manda la fecha explicita en hora de Colombia: la base usaria UTC y de noche seria "manana".
@@ -41,11 +46,13 @@ public class AcopioService {
         LocalDate fecha = Fechas.deOHoy(r.fechaPago(), "fecha_pago");
         long id = repo.registrarPago(r.idProveedor(), r.idPeriodoLiquidado(), r.monto(), r.metodoPago(),
                                      r.referenciaPago(), fecha);
+        archivos.alRegistrar("PAGO_LECHERO", id);
         return repo.pago(id).orElseThrow(() -> SilaException.noEncontrado("El pago no existe."));
     }
 
     public PagoProveedor anularPago(long id, String motivo) {
         repo.anularPago(id, motivo);
+        archivos.alAnular("PAGO_LECHERO", id);
         return repo.pago(id).orElseThrow(() -> SilaException.noEncontrado("El pago no existe."));
     }
 }

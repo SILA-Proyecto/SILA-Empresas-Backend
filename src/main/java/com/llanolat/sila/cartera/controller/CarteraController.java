@@ -27,7 +27,12 @@ public class CarteraController {
 
     private final CarteraRepository repo;
 
-    public CarteraController(CarteraRepository repo) { this.repo = repo; }
+    private final com.llanolat.sila.archivos.ComprobanteArchivos archivos;
+
+    public CarteraController(CarteraRepository repo, com.llanolat.sila.archivos.ComprobanteArchivos archivos) {
+        this.repo = repo;
+        this.archivos = archivos;
+    }
 
     @GetMapping("/clientes")
     public Page<ClienteCartera> clientes(
@@ -71,6 +76,7 @@ public class CarteraController {
     @ResponseStatus(HttpStatus.CREATED)
     public Recibo registrarAbono(@Valid @RequestBody AbonoRequest r) {
         var creado = repo.registrarAbono(r.idCliente(), r.monto(), r.metodoPago(), r.referencia());
+        archivos.alRegistrar("ABONO", creado.idRecibo());
         return new Recibo(creado.idRecibo(), creado.saldoRestante(), repo.abonosDeRecibo(creado.idRecibo()));
     }
 

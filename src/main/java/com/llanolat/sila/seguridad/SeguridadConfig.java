@@ -58,6 +58,12 @@ public class SeguridadConfig {
                     .hasAnyAuthority("TIPO_MFA_ENROLAR", "TIPO_ACCESO")
                 .requestMatchers(HttpMethod.POST, AUTH + "/cambiar-clave")
                     .hasAnyAuthority("TIPO_CAMBIAR_CLAVE", "TIPO_ACCESO")
+                // Archivos: Google vuelve al callback sin token de sesion (se valida el "state" firmado); subir, archivar,
+                // carpetas, bitacora y Drive son de ADMIN; ver y descargar, de cualquier usuario autenticado.
+                .requestMatchers(HttpMethod.GET, "/api/v1/archivos/drive/callback").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/archivos", "/api/v1/archivos/*/archivar", "/api/v1/archivos/carpetas",
+                                 "/api/v1/archivos/carpetas/*/archivar", "/api/v1/archivos/drive/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/v1/archivos/accesos", "/api/v1/archivos/drive/**").hasRole("ADMIN")
                 .requestMatchers("/api/v1/usuarios/**", "/api/v1/auditoria/**").hasRole("ADMIN")
                 // Escrituras reservadas a ADMIN. La base las verifica igual; esto responde antes y de forma uniforme.
                 .requestMatchers(HttpMethod.POST, "/api/v1/periodos/**").hasRole("ADMIN")

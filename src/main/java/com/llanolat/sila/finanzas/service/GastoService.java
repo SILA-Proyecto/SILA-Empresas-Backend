@@ -13,16 +13,23 @@ public class GastoService {
 
     private final GastoRepository repo;
 
-    public GastoService(GastoRepository repo) { this.repo = repo; }
+    private final com.llanolat.sila.archivos.ComprobanteArchivos archivos;
+
+    public GastoService(GastoRepository repo, com.llanolat.sila.archivos.ComprobanteArchivos archivos) {
+        this.repo = repo;
+        this.archivos = archivos;
+    }
 
     public Gasto registrar(RegistrarGastoRequest r) {
         // Fecha explicita en hora de Colombia: la base usaria UTC y de noche caeria en la quincena equivocada.
         long id = repo.registrar(r.idCategoria(), r.concepto(), r.monto(), Fechas.deOHoy(r.fechaGasto(), "fecha_gasto"));
+        archivos.alRegistrar("GASTO", id);
         return gasto(id);
     }
 
     public Gasto anular(long id, String motivo) {
         repo.anular(id, motivo);
+        archivos.alAnular("GASTO", id);
         return gasto(id);
     }
 
