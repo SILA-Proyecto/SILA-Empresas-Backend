@@ -43,8 +43,6 @@ resultado del periodo) las resuelve la vista, no el backend.
 | GET | `/api/v1/ventas/{id}/detalle` | | vw_detalle_ticket_venta |
 | GET | `/api/v1/cartera` | `soloConDeuda`, `moraMinima` | vw_dashboard_cartera |
 | GET | `/api/v1/cartera/abonos` | `idCliente`, `idVenta`, `idRecibo` | vw_abonos_cartera |
-| GET | `/api/v1/facturas` | `estadoDian`, `idVenta` | vw_facturas |
-| GET | `/api/v1/facturacion/resoluciones` | `soloActivas` | vw_resoluciones_facturacion |
 | GET | `/api/v1/finanzas/categorias` | `soloActivas` | vw_categorias_gasto |
 | GET | `/api/v1/finanzas/gastos/por-categoria` | `idPeriodo` | vw_gastos_por_categoria |
 | GET | `/api/v1/documentos/pendientes` | `estado` | vw_documentos_pendientes_carga |
@@ -80,7 +78,7 @@ Siguen el contrato del dashboard (sección «Acopio de leche» y «Producción e
 | 20001, 20005 | 400 | parametro o abono invalido |
 | 20008 | 403 | rol insuficiente o sin sesion |
 | 20007 | 404 | no existe |
-| 20002,20003,20004,20006,20009,20010,20011,20012 | 409 | conflicto de estado |
+| 20002,20003,20004,20006,20009,20010,20011 | 409 | conflicto de estado |
 | 20999 | 500 | fallo interno; el detalle esta en log_errores |
 
 `referencia` apunta a `log_errores.id_log` cuando la base registro el detalle.
@@ -90,7 +88,7 @@ solo queda en esa tabla.
 
 ## Pendiente
 
-- Modulos de escritura de ventas, cartera, facturacion, acopio, produccion,
+- Modulos de escritura de ventas, cartera, acopio, produccion,
   finanzas (gastos) y documentos.
 - Spring Security + JWT, reemplazando `IdentidadDesdeCabecera`, que hoy es un
   hueco: cualquiera puede mandar `X-Rol: ADMIN`.

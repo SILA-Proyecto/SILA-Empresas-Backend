@@ -8,7 +8,7 @@ import java.util.regex.Pattern;
  * Un error devuelto por la base de datos, ya interpretado.
  *
  * La base distingue dos cosas:
- *  - 20001..20012: error de negocio. El mensaje es limpio y se le puede
+ *  - 20001..20011: error de negocio. El mensaje es limpio y se le puede
  *    mostrar al usuario final tal cual.
  *  - 20999: fallo inesperado. El mensaje solo trae una referencia; el detalle
  *    (traza incluida) quedo en la tabla log_errores. NO mostrar al usuario.
@@ -26,7 +26,6 @@ public class SilaException extends RuntimeException {
     public static final int PERIODO_NO_ENCONTRADO  = 20009;
     public static final int ESTADO_INVALIDO        = 20010;
     public static final int REGISTRO_INMUTABLE     = 20011;
-    public static final int FACTURACION            = 20012;
     // Originados en el backend (no en la base): autenticacion.
     public static final int AUTENTICACION          = 20013;  // credenciales o token invalidos -> 401
     public static final int CUENTA_BLOQUEADA       = 20014;  // bloqueo temporal por intentos fallidos -> 423

@@ -10,6 +10,6 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties(prefix = "sila.idempotencia")
 public record IdempotenciaProps(
-        @DefaultValue({"/api/v1/ventas", "/api/v1/cartera", "/api/v1/facturacion", "/api/v1/acopio", "/api/v1/produccion", "/api/v1/insumos/compras", "/api/v1/insumos/ajustes", "/api/v1/finanzas/gastos", "/api/v1/documentos"}) List<String> obligatoriaEn,
+        @DefaultValue({"/api/v1/ventas", "/api/v1/cartera", "/api/v1/acopio", "/api/v1/produccion", "/api/v1/insumos/compras", "/api/v1/insumos/ajustes", "/api/v1/finanzas/gastos", "/api/v1/documentos"}) List<String> obligatoriaEn,
         @DefaultValue("1048576") int maxBytes
 ) {}

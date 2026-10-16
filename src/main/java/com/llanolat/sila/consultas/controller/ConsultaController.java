@@ -2,9 +2,7 @@ package com.llanolat.sila.consultas.controller;
 
 import com.llanolat.sila.consultas.dto.CategoriasGastoDto;
 import com.llanolat.sila.consultas.dto.DocumentosPendientesCargaDto;
-import com.llanolat.sila.consultas.dto.FacturasDto;
 import com.llanolat.sila.consultas.dto.GastosPorCategoriaDto;
-import com.llanolat.sila.consultas.dto.ResolucionesFacturacionDto;
 import com.llanolat.sila.consultas.repository.OperacionConsultaRepository;
 import com.llanolat.sila.infra.SilaException;
 import com.llanolat.sila.infra.SilaTemplate;
@@ -31,20 +29,6 @@ public class ConsultaController {
     }
 
     // ===================== inventario y produccion =====================
-
-    // ===================== facturacion =====================
-
-    @GetMapping("/facturas")
-    public List<FacturasDto> facturas(@RequestParam(required = false) String estadoDian,
-                                      @RequestParam(required = false) Long idVenta) {
-        return operaciones.facturas(estadoDian, idVenta);
-    }
-
-    @GetMapping("/facturacion/resoluciones")
-    public List<ResolucionesFacturacionDto> resoluciones(
-            @RequestParam(defaultValue = "false") boolean soloActivas) {
-        return operaciones.resoluciones(soloActivas);
-    }
 
     // ===================== finanzas =====================
 

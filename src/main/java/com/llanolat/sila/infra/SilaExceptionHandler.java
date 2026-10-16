@@ -42,8 +42,7 @@ public class SilaExceptionHandler {
                  SilaException.OPERACION_NO_PERMITIDA,
                  SilaException.PERIODO_NO_ENCONTRADO,
                  SilaException.ESTADO_INVALIDO,
-                 SilaException.REGISTRO_INMUTABLE,
-                 SilaException.FACTURACION              -> HttpStatus.CONFLICT;      // 409
+                 SilaException.REGISTRO_INMUTABLE       -> HttpStatus.CONFLICT;      // 409
             default                                      -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
 

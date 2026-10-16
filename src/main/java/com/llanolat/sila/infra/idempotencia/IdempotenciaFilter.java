@@ -30,7 +30,7 @@ import org.springframework.web.util.ContentCachingResponseWrapper;
 /**
  * Idempotency-Key: si el cliente repite una escritura (reintento de red, doble clic) con la
  * misma clave y el mismo contenido, se devuelve la respuesta de la primera vez en lugar de
- * ejecutarla de nuevo (una venta, un abono o una factura NO se duplican).
+ * ejecutarla de nuevo (una venta o un abono NO se duplican).
  *
  *  - Aplica a POST/PUT/PATCH/DELETE de /api/v1, menos /auth y /usuarios (sus respuestas llevan claves).
  *  - La clave es opcional, salvo en las rutas de {@link IdempotenciaProps#obligatoriaEn()}.
