@@ -1,5 +1,7 @@
 package com.llanolat.sila.archivos;
 
+import static com.llanolat.sila.infra.Peticion.agente;
+import static com.llanolat.sila.infra.Peticion.ip;
 import com.llanolat.sila.archivos.ArchivoService.Entrega;
 import com.llanolat.sila.archivos.Archivos.AccesoDocumento;
 import com.llanolat.sila.archivos.Archivos.ArchivarRequest;

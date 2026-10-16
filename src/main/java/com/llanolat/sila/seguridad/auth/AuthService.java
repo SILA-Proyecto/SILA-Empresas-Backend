@@ -281,8 +281,10 @@ class AuthService {
         return passkeys.listar(idDe(jwt));
     }
 
-    void quitarPasskey(Jwt jwt, long idPasskey, String ip, String userAgent) {
+    /** Quitar un dispositivo es una accion sensible, igual que agregarlo: pide el codigo de la app (o uno de respaldo). */
+    void quitarPasskey(Jwt jwt, long idPasskey, String codigo, String ip, String userAgent) {
         exigirAlgunTipo(jwt, Tipo.ACCESO);
+        exigirSegundoFactor(cargar(jwt), codigo, ip, userAgent);
         if (passkeys.quitar(idDe(jwt), idPasskey) == 0) {
             throw SilaException.noEncontrado("El dispositivo no existe.");
         }

@@ -6,9 +6,14 @@ import com.llanolat.sila.comprobantes.ComprobanteRepository;
 import com.llanolat.sila.comprobantes.Comprobantes.Detalle;
 import com.llanolat.sila.infra.Fechas;
 import com.llanolat.sila.infra.Identidad;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -21,6 +26,10 @@ import org.springframework.stereotype.Service;
  * esta guardado y el PDF lo repone {@link #reintentar} (solo para movimientos desde la fecha de corte).
  *
  * Al anular, el PDF original NO se toca: se agrega un segundo PDF con la marca de agua «ANULADO».
+ *
+ * Fecha de corte del reintento: la configurada (SILA_DOCS_FECHA_CORTE) o, si no hay, la del movimiento mas antiguo que ya
+ * tiene PDF o, si todavia no hay ninguno, el dia en que arranco el sistema. Asi un PDF que fallo al registrar se repone
+ * siempre, sin generar «originales» retroactivos de lo anterior a la funcion.
  */
 @Service
 public class ComprobanteArchivos {
@@ -35,6 +44,11 @@ public class ComprobanteArchivos {
     private final AlmacenArchivos almacen;
     private final ArchivosProps props;
     private final ObjectProvider<Identidad> identidad;
+    private final LocalDate arranque = LocalDate.now(Fechas.COLOMBIA);
+    /** Comprobantes cuyo PDF se esta generando ahora: evita que la peticion y el reintento lo hagan a la vez. */
+    private final Set<String> enCurso = ConcurrentHashMap.newKeySet();
+    private final Map<String, Integer> fallos = new ConcurrentHashMap<>();
+    private final Map<String, Instant> proximo = new ConcurrentHashMap<>();
 
     public ComprobanteArchivos(ComprobanteRepository comprobantes, ArchivoRepository repo, GeneradorPdf generador,
                                CifradoDocs cifrado, AlmacenArchivos almacen, ArchivosProps props,
@@ -72,25 +86,33 @@ public class ComprobanteArchivos {
         }
     }
 
-    /** Repone los PDF que faltan (movimientos desde la fecha de corte). Sin fecha de corte no hace nada. */
+    /** Repone los PDF que faltan (movimientos desde la fecha de corte). Los que fallan esperan cada vez mas (hasta 60 min). */
     @Scheduled(initialDelayString = "PT1M", fixedDelayString = "PT2M")
     public void reintentar() {
-        if (props.fechaCorte() == null) {
-            return;
-        }
         try {
-            List<String[]> faltan = repo.sinPdf(props.fechaCorte(), LOTE);
+            LocalDate corte = props.fechaCorte() != null ? props.fechaCorte() : repo.fechaPrimerPdf().orElse(arranque);
+            Instant ahora = Instant.now();
+            long enEspera = proximo.values().stream().filter(ahora::isBefore).count();
+            List<String[]> faltan = repo.sinPdf(corte, (int) Math.min(1000, LOTE + enEspera));
+            int intentados = 0;
             for (String[] f : faltan) {
                 String version = f[2];
+                String clave = f[0] + "|" + f[1] + "|" + version;
+                if (Instant.now().isBefore(proximo.getOrDefault(clave, Instant.EPOCH))) continue;
+                if (++intentados > LOTE) break;
                 try {
                     generar(props.usuarioSistema(), f[0], Long.parseLong(f[1]), version,
                             "ANULADO".equals(version) ? new Anulacion(null, null, null) : null);
+                    fallos.remove(clave);
+                    proximo.remove(clave);
                 } catch (RuntimeException e) {
-                    log.warn("Reintento de PDF fallido para {} #{} ({}).", f[0], f[1], version, e);
+                    int n = fallos.merge(clave, 1, Integer::sum);
+                    proximo.put(clave, Instant.now().plusSeconds(120L * Math.min(30, 1L << Math.min(n - 1, 5))));
+                    log.warn("Reintento de PDF fallido para {} #{} ({}), intento {}.", f[0], f[1], version, n, e);
                 }
             }
-            if (!faltan.isEmpty()) {
-                log.info("Reintento de PDF: {} comprobante(s) revisados.", faltan.size());
+            if (intentados > 0) {
+                log.info("Reintento de PDF: {} comprobante(s) revisados.", intentados);
             }
         } catch (RuntimeException e) {
             log.warn("No se pudo revisar los comprobantes sin PDF.", e);
@@ -99,6 +121,18 @@ public class ComprobanteArchivos {
 
     /** @return true si se creo el PDF; false si ya existia. @param sistema usuario de sistema o null (peticion actual) */
     boolean generar(String sistema, String tipo, long id, String version, Anulacion anulacion) {
+        String clave = tipo + "|" + id + "|" + version;
+        if (!enCurso.add(clave)) {
+            return false;                                   // otro hilo lo esta generando en este momento
+        }
+        try {
+            return generarExclusivo(sistema, tipo, id, version, anulacion);
+        } finally {
+            enCurso.remove(clave);
+        }
+    }
+
+    private boolean generarExclusivo(String sistema, String tipo, long id, String version, Anulacion anulacion) {
         List<Archivo> existentes = repo.deComprobante(tipo, id);
         if (existentes.stream().anyMatch(a -> version.equals(a.version()))) {
             return false;

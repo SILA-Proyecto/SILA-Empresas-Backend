@@ -407,10 +407,15 @@ public class GeneradorPdf {
         return lineas;
     }
 
+    /** Una fuente por hilo: cargar las metricas de Helvetica en cada texto es caro y el objeto no se comparte entre hilos. */
+    private static final ThreadLocal<PDType1Font> FUENTE_LIMPIEZA =
+            ThreadLocal.withInitial(() -> new PDType1Font(Standard14Fonts.FontName.HELVETICA));
+
     /** Deja solo lo que Helvetica (WinAnsi) puede dibujar; lo demas se cambia por '?'. Sin saltos ni tabulaciones. */
     static String limpiar(String s) {
         if (s == null) return "";
-        PDType1Font f = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
+        if (s.chars().allMatch(c -> c >= 32 && c <= 126)) return s;     // ASCII imprimible: ya es dibujable, sin tocar la fuente
+        PDType1Font f = FUENTE_LIMPIEZA.get();
         StringBuilder b = new StringBuilder();
         s.replaceAll("[\\p{Cntrl}]", " ").codePoints().forEach(cp -> {
             String ch = new String(Character.toChars(cp));

@@ -57,9 +57,14 @@ public class DriveCliente {
     private final SecretKeySpec claveEstado;
     private final Map<String, Instant> estadosUsados = new ConcurrentHashMap<>();
 
-    private Credencial credencial;
-    private String accessToken;
-    private Instant accessExpira = Instant.EPOCH;
+    /** Cambia la credencial y el token de acceso (candado corto); las subidas largas usan {@link #candadoSubida}. */
+    private final Object candadoToken = new Object();
+    /** Serializa las subidas: una a la vez, SIN bloquear la lectura del estado ni la conexion/desconexion. */
+    private final Object candadoSubida = new Object();
+
+    private volatile Credencial credencial;
+    private String accessToken;                              // solo bajo candadoToken
+    private Instant accessExpira = Instant.EPOCH;            // solo bajo candadoToken
     private volatile String ultimoError;
     private volatile boolean revocado;
     private volatile LocalDateTime ultimaSincronizacion;
@@ -80,12 +85,15 @@ public class DriveCliente {
     public boolean configurado() { return cfg.configurado(); }
 
     /** Hay una cuenta conectada (aunque Google haya revocado el permiso: ver {@link #listo}). */
-    public synchronized boolean conectado() { return credencial != null; }
+    public boolean conectado() { return credencial != null; }
 
     /** Conectado y sin que Google haya rechazado el token: se puede subir. */
-    public synchronized boolean listo() { return credencial != null && !revocado; }
+    public boolean listo() { return credencial != null && !revocado; }
 
-    public synchronized String cuenta() { return credencial == null ? null : credencial.cuenta(); }
+    public String cuenta() {
+        Credencial c = credencial;
+        return c == null ? null : c.cuenta();
+    }
     public String ultimoError() { return ultimoError; }
     public LocalDateTime ultimaSincronizacion() { return ultimaSincronizacion; }
     public String nombreCarpeta() { return cfg.carpeta(); }
@@ -111,19 +119,25 @@ public class DriveCliente {
     }
 
     /** Cierra el flujo: valida el state, cambia el codigo por tokens y guarda el de renovacion cifrado. */
-    public synchronized void completar(String code, String state) {
+    public void completar(String code, String state) {
         exigirConfigurado();
         verificarEstado(state);
         if (code == null || code.isBlank() || code.length() > 2048) {
             throw SilaException.parametroInvalido("Falta el codigo de autorizacion.");
         }
+        synchronized (candadoToken) {
+            canjearCodigo(code);
+        }
+    }
+
+    private void canjearCodigo(String code) {
         Map<String, String> p = new LinkedHashMap<>();
         p.put("code", code);
         p.put("client_id", cfg.clientId());
         p.put("client_secret", cfg.clientSecret());
         p.put("redirect_uri", cfg.redirectUri());
         p.put("grant_type", "authorization_code");
-        JsonNode r = pedirToken(p);
+        JsonNode r = pedirToken(p, false);
         String refresh = texto(r, "refresh_token");
         if (refresh == null) {
             throw SilaException.de(SilaException.SERVICIO_NO_DISPONIBLE,
@@ -145,12 +159,14 @@ public class DriveCliente {
         log.info("Drive conectado (cuenta {}).", cuenta);
     }
 
-    public synchronized void desconectar() {
-        this.credencial = null;
-        this.accessToken = null;
-        this.accessExpira = Instant.EPOCH;
-        this.revocado = false;
-        almacen.borrarSellado(ARCHIVO_TOKEN);
+    public void desconectar() {
+        synchronized (candadoToken) {
+            this.credencial = null;
+            this.accessToken = null;
+            this.accessExpira = Instant.EPOCH;
+            this.revocado = false;
+            almacen.borrarSellado(ARCHIVO_TOKEN);
+        }
         log.info("Drive desconectado: se borro el token guardado.");
     }
 
@@ -196,7 +212,13 @@ public class DriveCliente {
      * Sube un archivo (ya cifrado) a la carpeta de respaldo; si ya existe uno con ese nombre (un intento anterior que
      * llego a Drive pero no alcanzo a registrarse), lo reutiliza en vez de duplicarlo.
      */
-    public synchronized Subido subir(String nombre, byte[] datos) {
+    public Subido subir(String nombre, byte[] datos) {
+        synchronized (candadoSubida) {
+            return subirSerializado(nombre, datos);
+        }
+    }
+
+    private Subido subirSerializado(String nombre, byte[] datos) {
         exigirListo();
         String carpeta = asegurarCarpeta();
         JsonNode existentes = get("/drive/v3/files?spaces=drive&fields=files(id,webViewLink)&q="
@@ -222,7 +244,9 @@ public class DriveCliente {
     }
 
     private String asegurarCarpeta() {
-        if (credencial.folderId() != null) return credencial.folderId();
+        Credencial actual = credencial;
+        if (actual == null) throw falla("Drive se desconecto durante la subida.");
+        if (actual.folderId() != null) return actual.folderId();
         JsonNode buscadas = get("/drive/v3/files?spaces=drive&fields=files(id)&q=" + codificar(
                 "name = '" + cfg.carpeta().replace("'", "\\'") + "' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"));
         String id;
@@ -235,8 +259,12 @@ public class DriveCliente {
                     .POST(HttpRequest.BodyPublishers.ofString(cuerpo)).timeout(Duration.ofSeconds(30)).build()));
             id = texto(creada, "id");
         }
-        credencial = new Credencial(credencial.refreshToken(), id, credencial.cuenta());
-        guardar();
+        synchronized (candadoToken) {
+            if (credencial == actual) {                       // si se desconecto o reconecto mientras tanto, no se pisa
+                credencial = new Credencial(actual.refreshToken(), id, actual.cuenta());
+                guardar();
+            }
+        }
         return id;
     }
 
@@ -248,25 +276,37 @@ public class DriveCliente {
     }
 
     private String tokenAcceso() {
-        if (accessToken != null && Instant.now().isBefore(accessExpira)) return accessToken;
-        Map<String, String> p = new LinkedHashMap<>();
-        p.put("client_id", cfg.clientId());
-        p.put("client_secret", cfg.clientSecret());
-        p.put("refresh_token", credencial.refreshToken());
-        p.put("grant_type", "refresh_token");
-        JsonNode r = pedirToken(p);
-        accessToken = texto(r, "access_token");
-        accessExpira = Instant.now().plusSeconds(Math.max(60, r.path("expires_in").asLong(3600)) - 60);
-        return accessToken;
+        synchronized (candadoToken) {
+            if (accessToken != null && Instant.now().isBefore(accessExpira)) return accessToken;
+            Credencial c = credencial;
+            if (c == null) throw falla("Drive no esta conectado.");
+            Map<String, String> p = new LinkedHashMap<>();
+            p.put("client_id", cfg.clientId());
+            p.put("client_secret", cfg.clientSecret());
+            p.put("refresh_token", c.refreshToken());
+            p.put("grant_type", "refresh_token");
+            JsonNode r = pedirToken(p, true);
+            accessToken = texto(r, "access_token");
+            accessExpira = Instant.now().plusSeconds(Math.max(60, r.path("expires_in").asLong(3600)) - 60);
+            return accessToken;
+        }
     }
 
-    private JsonNode pedirToken(Map<String, String> parametros) {
+    /**
+     * {@code renovacion}: true al renovar el token de acceso con el de renovacion guardado (un invalid_grant significa que
+     * Google revoco el permiso); false al canjear el codigo de una conexion nueva (significa solo que el codigo vencio o ya
+     * se uso, y NO debe tumbar una conexion que seguia funcionando).
+     */
+    private JsonNode pedirToken(Map<String, String> parametros, boolean renovacion) {
         HttpResponse<String> r = enviarCrudo(HttpRequest.newBuilder(URI.create(cfg.tokenUrl()))
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .POST(HttpRequest.BodyPublishers.ofString(formulario(parametros))).timeout(Duration.ofSeconds(30)).build());
         if (r.statusCode() == 400 || r.statusCode() == 401) {
             JsonNode e = parsear(r.body());
             if ("invalid_grant".equals(texto(e, "error"))) {
+                if (!renovacion) {
+                    throw falla("El codigo de autorizacion vencio o ya se uso. Inicie la conexion de nuevo.");
+                }
                 revocado = true;
                 ultimoError = "Google rechazo el permiso (vencido o revocado). Vuelva a conectar Drive.";
                 throw falla(ultimoError);
@@ -366,11 +406,12 @@ public class DriveCliente {
         }
     }
 
-    private void guardar() {
+    private void guardar() {                                  // siempre bajo candadoToken
+        Credencial c = credencial;
         Map<String, String> m = new LinkedHashMap<>();
-        m.put("refresh_token", credencial.refreshToken());
-        if (credencial.folderId() != null) m.put("folder_id", credencial.folderId());
-        if (credencial.cuenta() != null) m.put("cuenta", credencial.cuenta());
+        m.put("refresh_token", c.refreshToken());
+        if (c.folderId() != null) m.put("folder_id", c.folderId());
+        if (c.cuenta() != null) m.put("cuenta", c.cuenta());
         almacen.escribirSellado(ARCHIVO_TOKEN, cifrado.sellar(json.writeValueAsString(m).getBytes(StandardCharsets.UTF_8), ETIQUETA));
     }
 }

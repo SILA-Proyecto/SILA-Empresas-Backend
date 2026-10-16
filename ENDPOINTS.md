@@ -141,7 +141,7 @@ Contrato en el dashboard (`docs/CONTRATO_BACKEND.md`, «Gastos operativos y docu
 | Método | Ruta | Rol | Qué hace |
 |---|---|---|---|
 | POST | `/api/v1/auth/passkey/opciones` · `/passkey/verificar` | token temporal `mfa` | segundo factor con passkey (Yubico webauthn-server-core; pkg_passkeys.sp_usar) |
-| GET · DELETE | `/api/v1/auth/passkeys` · `/{id}` | todos | mis dispositivos (vw_passkeys) / pkg_passkeys.sp_quitar |
+| GET · DELETE | `/api/v1/auth/passkeys` · `/{id}` | todos | mis dispositivos (vw_passkeys) / pkg_passkeys.sp_quitar. **DELETE pide el código del segundo factor** en el cuerpo `{codigo}` (6 dígitos o respaldo): 400 sin código, 401 si es malo |
 | POST | `/api/v1/auth/passkeys/opciones` · `/passkeys` | todos (con segundo factor activo) | registrar un dispositivo: pide el código de la app; pkg_passkeys.sp_registrar |
 
 ## Archivos (PDF de comprobantes, archivos del ADMIN, carpetas, Drive)
@@ -165,4 +165,4 @@ Contrato en el dashboard (`docs/CONTRATO_BACKEND.md`, «Archivos»). SQL: `~/sil
 | GET | `/api/v1/archivos/drive/callback` | público (state firmado, un solo uso) | vuelta de Google; redirige a `SILA_DRIVE_RETORNO?drive=ok\|error` |
 | POST | `/api/v1/archivos/drive/sincronizar` · `/desconectar` | ADMIN | envía lo pendiente ahora · borra el acceso guardado |
 
-Los PDF de comprobantes NO tienen endpoint de escritura: `ComprobanteArchivos` los genera dentro de la propia petición de registro/anulación de VENTA, ABONO, PAGO_LECHERO, COMPRA_INSUMO y GASTO (si falla, el movimiento ya está guardado y un reintento cada 2 min lo repone desde `SILA_DOCS_FECHA_CORTE`). Errores nuevos: `20018` (422 contenido no admitido / 413 tamaño) y `20019` (503 antivirus o Drive no disponibles).
+Los PDF de comprobantes NO tienen endpoint de escritura: `ComprobanteArchivos` los genera dentro de la propia petición de registro/anulación de VENTA, ABONO, PAGO_LECHERO, COMPRA_INSUMO y GASTO (si falla, el movimiento ya está guardado y un reintento cada 2 min lo repone, con espera creciente si vuelve a fallar; desde `SILA_DOCS_FECHA_CORTE` o, si está vacía, desde el movimiento más antiguo que ya tiene PDF o desde el día de arranque). Errores nuevos: `20018` (422 contenido no admitido / 413 tamaño) y `20019` (503 antivirus o Drive no disponibles).

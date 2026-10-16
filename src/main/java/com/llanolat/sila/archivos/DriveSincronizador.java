@@ -52,10 +52,16 @@ public class DriveSincronizador {
             throw SilaException.de(SilaException.SERVICIO_NO_DISPONIBLE, "Drive no esta conectado o Google rechazo el permiso.");
         }
         int subidos = 0;
-        List<String[]> cola = repo.pendientesDrive(LOTE);
+        int intentados = 0;
+        // Los que estan en espera de reintento siguen en la cola y ocuparian el lote: se pide de mas para que los nuevos no
+        // queden detras de ellos.
+        Instant ahora = Instant.now();
+        long enEspera = forzar ? 0 : proximo.values().stream().filter(ahora::isBefore).count();
+        List<String[]> cola = repo.pendientesDrive((int) Math.min(1000, LOTE + enEspera));
         for (String[] item : cola) {
             long id = Long.parseLong(item[0]);
             if (!forzar && Instant.now().isBefore(proximo.getOrDefault(id, Instant.EPOCH))) continue;
+            if (++intentados > LOTE) break;
             try {
                 byte[] cifrado = almacen.leer(item[1]);
                 if (cifrado == null) throw new IllegalStateException("el archivo no esta en el disco del servidor");

@@ -145,8 +145,11 @@ public class ValidadorSubida {
     // ------------------------------------------------------------------- PDF
 
     private static final Set<String> CLAVES_ACTIVAS = Set.of(
-            "JS", "JavaScript", "Launch", "EmbeddedFile", "EmbeddedFiles", "RichMedia", "XFA", "SubmitForm",
-            "ImportData", "GoToR", "GoToE", "Movie", "Sound", "Rendition", "FileAttachment");
+            "JS", "JavaScript", "Launch", "EmbeddedFiles", "EF", "RichMediaContent", "XFA", "SubmitForm",
+            "ImportData", "GoToR", "GoToE", "Movie", "Sound", "Rendition");
+    /** Valores de /Type y /Subtype que marcan adjuntos o multimedia (no son claves del diccionario, son su valor). */
+    private static final Set<String> TIPOS_ACTIVOS = Set.of(
+            "EmbeddedFile", "FileAttachment", "RichMedia", "Movie", "Sound", "Screen", "3D");
     private static final Set<String> ACCIONES_PELIGROSAS = Set.of(
             "JavaScript", "Launch", "URI", "SubmitForm", "ImportData", "GoToR", "GoToE", "Rendition", "Movie", "Sound");
 
@@ -186,6 +189,10 @@ public class ValidadorSubida {
                 for (var e : d.entrySet()) {
                     String clave = e.getKey().getName();
                     if (CLAVES_ACTIVAS.contains(clave)) return clave;
+                    if ((clave.equals("Type") || clave.equals("Subtype")) && e.getValue() instanceof COSName tipo
+                            && TIPOS_ACTIVOS.contains(tipo.getName())) {
+                        return tipo.getName();
+                    }
                     if (clave.equals("S") && e.getValue() instanceof COSName accion && ACCIONES_PELIGROSAS.contains(accion.getName())) {
                         return "accion " + accion.getName();
                     }
@@ -313,6 +320,6 @@ public class ValidadorSubida {
         }
         BufferedImage destino = new BufferedImage(girada ? h : w, girada ? w : h,
                 img.getType() == 0 ? BufferedImage.TYPE_INT_ARGB : img.getType());
-        return new AffineTransformOp(t, AffineTransformOp.TYPE_BILINEAR).filter(img, destino);
+        return new AffineTransformOp(t, AffineTransformOp.TYPE_NEAREST_NEIGHBOR).filter(img, destino);
     }
 }

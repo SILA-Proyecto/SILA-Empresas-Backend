@@ -331,6 +331,13 @@ public class ArchivoRepository {
 
     // ----------------------------------------------------- reintento y Drive
 
+    /** Fecha del movimiento mas antiguo que ya tiene PDF de comprobante: marca desde cuando el sistema genera PDF. */
+    public Optional<LocalDate> fechaPrimerPdf() {
+        return jdbc.sql("SELECT MIN(fecha_comprobante) FROM vw_archivos WHERE origen = 'COMPROBANTE'")
+                   .query((rs, n) -> rs.getDate(1) == null ? null : rs.getDate(1).toLocalDate())
+                   .list().stream().filter(java.util.Objects::nonNull).findFirst();
+    }
+
     /** Comprobantes sin PDF desde la fecha de corte: [tipo, id, version]. */
     public List<String[]> sinPdf(LocalDate corte, int limite) {
         return jdbc.sql("SELECT tipo, id_entidad, version_faltante FROM vw_comprobantes_sin_pdf WHERE fecha >= :corte"

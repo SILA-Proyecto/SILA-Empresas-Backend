@@ -1,5 +1,7 @@
 package com.llanolat.sila.seguridad.auth;
 
+import static com.llanolat.sila.infra.Peticion.agente;
+import static com.llanolat.sila.infra.Peticion.ip;
 import com.llanolat.sila.infra.SilaException;
 import com.llanolat.sila.seguridad.SeguridadProps;
 import com.llanolat.sila.seguridad.auth.AuthDtos.ActualizarPerfilRequest;
@@ -15,6 +17,7 @@ import com.llanolat.sila.seguridad.auth.AuthDtos.SesionesCerradas;
 import com.llanolat.sila.seguridad.auth.AuthDtos.LoginRequest;
 import com.llanolat.sila.seguridad.auth.AuthDtos.MfaConfig;
 import com.llanolat.sila.seguridad.auth.AuthDtos.PasskeyOpcionesRequest;
+import com.llanolat.sila.seguridad.auth.AuthDtos.PasskeyQuitarRequest;
 import com.llanolat.sila.seguridad.auth.AuthDtos.PasskeyRegistroRequest;
 import com.llanolat.sila.seguridad.auth.AuthDtos.PasskeyVerificarRequest;
 import com.llanolat.sila.seguridad.auth.AuthDtos.UsuarioSesion;
@@ -165,8 +168,9 @@ class AuthController {
     }
 
     @DeleteMapping("/passkeys/{id}")
-    ResponseEntity<Void> quitarPasskey(@AuthenticationPrincipal Jwt jwt, @PathVariable long id, HttpServletRequest req) {
-        service.quitarPasskey(jwt, id, ip(req), agente(req));
+    ResponseEntity<Void> quitarPasskey(@AuthenticationPrincipal Jwt jwt, @PathVariable long id,
+                                       @Valid @RequestBody PasskeyQuitarRequest r, HttpServletRequest req) {
+        service.quitarPasskey(jwt, id, r.codigo(), ip(req), agente(req));
         return ResponseEntity.noContent().build();
     }
 
@@ -247,12 +251,4 @@ class AuthController {
         }
     }
 
-    private static String ip(HttpServletRequest req) {
-        return req.getRemoteAddr();
-    }
-
-    private static String agente(HttpServletRequest req) {
-        String ua = req.getHeader("User-Agent");
-        return ua == null ? null : ua.replaceAll("[\\r\\n]", " ");
-    }
 }

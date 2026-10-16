@@ -384,8 +384,10 @@ try:
     chk('token de ACCESO no sirve en /passkey/verificar -> 403', auth('/passkey/verificar', {'credencial': firmado}, acc_admin).status_code == 403)
     chk('un OPERATIVO sin segundo factor no puede registrar -> 409',
         llamar('POST', '/auth/passkeys/opciones', entrar_tmp_operativo(), {'codigo': '123456'}).status_code == 409)
-    chk('quitar un dispositivo ajeno o inexistente -> 404', llamar('DELETE', '/auth/passkeys/999999999', acc_admin).status_code == 404)
-    chk('quitar mi dispositivo -> 204', llamar('DELETE', f'/auth/passkeys/{id_pk}', acc_admin).status_code == 204)
+    chk('quitar un dispositivo sin codigo -> 400', llamar('DELETE', f'/auth/passkeys/{id_pk}', acc_admin, {}).status_code == 400)
+    chk('quitar un dispositivo con codigo malo -> 401', llamar('DELETE', f'/auth/passkeys/{id_pk}', acc_admin, {'codigo': 'XXXXXXXXXX'}).status_code == 401)
+    chk('quitar un dispositivo ajeno o inexistente -> 404', llamar('DELETE', '/auth/passkeys/999999999', acc_admin, {'codigo': nuevos[5]}).status_code == 404)
+    chk('quitar mi dispositivo -> 204', llamar('DELETE', f'/auth/passkeys/{id_pk}', acc_admin, {'codigo': nuevos[6]}).status_code == 204)
     j = auth('/login', {'usuario': U_ADMIN, 'clave': N_ADMIN}).json()
     chk('sin dispositivos: passkey_disponible false y opciones -> 409', j.get('passkey_disponible') is False
         and auth('/passkey/opciones', None, j['token_temporal']).status_code == 409, j)
@@ -413,7 +415,7 @@ try:
         ('GET', '/tablero', None, {401}, {200}, {200}),
         ('GET', '/auth/passkeys', None, {401}, {200}, {200}),
         ('POST', '/auth/passkeys/opciones', {}, {401}, {400}, {400}),
-        ('DELETE', f'/auth/passkeys/{G}', None, {401}, {404}, {404}),
+        ('DELETE', f'/auth/passkeys/{G}', {}, {401}, {400}, {400}),
         ('POST', '/auth/passkey/opciones', None, {401}, {403}, {403}),
         ('GET', '/comprobantes?size=1', None, {401}, {200}, {200}),
         ('GET', '/comprobantes/resumen', None, {401}, {200}, {200}),

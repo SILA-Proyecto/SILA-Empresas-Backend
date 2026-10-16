@@ -47,6 +47,10 @@ final class AuthDtos {
     record PasskeyOpcionesRequest(
             @NotBlank @Size(max = 30) String codigo) {}
 
+    /** Quitar un dispositivo tambien es una accion sensible: pide el mismo codigo que al registrarlo. */
+    record PasskeyQuitarRequest(
+            @NotBlank @Size(max = 30) String codigo) {}
+
     record PasskeyRegistrada(Long idPasskey, String nombre) {}
 
     record UsuarioSesion(

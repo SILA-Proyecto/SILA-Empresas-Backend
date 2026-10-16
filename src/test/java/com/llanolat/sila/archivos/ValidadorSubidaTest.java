@@ -14,6 +14,9 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.interactive.action.PDActionJavaScript;
 import org.apache.pdfbox.pdmodel.interactive.action.PDActionURI;
+import org.apache.pdfbox.pdmodel.common.filespecification.PDComplexFileSpecification;
+import org.apache.pdfbox.pdmodel.common.filespecification.PDEmbeddedFile;
+import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationFileAttachment;
 import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationLink;
 import org.junit.jupiter.api.Test;
 
@@ -115,6 +118,28 @@ class ValidadorSubidaTest {
             pdf = o.toByteArray();
         }
         assertThatThrownBy(() -> v.validar("trampa.pdf", pdf)).isInstanceOf(ArchivoRechazadoException.class)
+                .hasMessageContaining("contenido activo");
+    }
+
+    @Test
+    void pdfConUnArchivoAdjuntoSeRechaza() throws Exception {
+        byte[] pdf;
+        try (PDDocument d = new PDDocument()) {
+            PDPage p = new PDPage();
+            d.addPage(p);
+            PDEmbeddedFile adjunto = new PDEmbeddedFile(d, new ByteArrayInputStream("MZ-programa".getBytes()));
+            adjunto.setSubtype("application/octet-stream");
+            PDComplexFileSpecification spec = new PDComplexFileSpecification();
+            spec.setFile("factura.exe");
+            spec.setEmbeddedFile(adjunto);
+            PDAnnotationFileAttachment nota = new PDAnnotationFileAttachment();
+            nota.setFile(spec);
+            p.getAnnotations().add(nota);
+            ByteArrayOutputStream o = new ByteArrayOutputStream();
+            d.save(o);
+            pdf = o.toByteArray();
+        }
+        assertThatThrownBy(() -> v.validar("adjunto.pdf", pdf)).isInstanceOf(ArchivoRechazadoException.class)
                 .hasMessageContaining("contenido activo");
     }
 
