@@ -93,9 +93,9 @@ public class CatalogoService {
 
     // ---------- proveedores ----------
 
-    public Page<ProveedorDto> listarProveedores(String texto, String tipoProveedor, Boolean activo,
+    public Page<ProveedorDto> listarProveedores(String texto, Boolean activo,
                                                 Integer page, Integer size, String sort) {
-        return lectura.proveedores(texto, tipoProveedor, activo, page, size, sort);
+        return lectura.proveedores(texto, activo, page, size, sort);
     }
 
     public ProveedorDto crearProveedor(CrearProveedorRequest r) {

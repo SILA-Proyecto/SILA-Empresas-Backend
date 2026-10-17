@@ -53,6 +53,9 @@ public class PeriodoController {
     /** ADMIN. Crea las 24 quincenas del anio. 201 si creo alguna, 200 si ya existian todas. */
     @PostMapping("/anio/{anio}")
     public ResponseEntity<CrearPeriodosResponse> crearAnio(@PathVariable int anio) {
+        if (anio < 2020 || anio > 2100) {
+            throw com.llanolat.sila.infra.SilaException.parametroInvalido("anio debe estar entre 2020 y 2100.", "anio");
+        }
         CrearPeriodosResponse r = service.crearAnio(anio);
         return ResponseEntity.status(r.creados() > 0 ? HttpStatus.CREATED : HttpStatus.OK).body(r);
     }

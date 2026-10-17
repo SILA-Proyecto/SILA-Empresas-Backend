@@ -12,7 +12,7 @@ import java.util.List;
 public final class Tablero {
 
     public record Respuesta(LocalDate fecha, Hoy hoy, Quincena quincena, Cartera cartera, Inventario inventario,
-                            Lecheros lecheros, Alertas alertas, List<VentaDia> ventasSemana) {}
+                            Proveedores proveedores, Alertas alertas, List<VentaDia> ventasSemana) {}
 
     /** Ventas del dia y la caja del dia (ingresos y egresos que mueven caja, de vw_comprobantes). */
     public record Hoy(BigDecimal ventasTotal, Integer ventasCantidad, BigDecimal ventasContado, BigDecimal ventasCredito,
@@ -23,15 +23,15 @@ public final class Tablero {
     public record Quincena(Long idPeriodo, Integer anio, Integer mes, Integer quincena, LocalDate fechaInicio, LocalDate fechaFin,
                            String estado, BigDecimal ingresosVentas, BigDecimal totalVendido, BigDecimal totalCobrado,
                            BigDecimal costoProduccion, BigDecimal gastosOperativos, BigDecimal carteraCastigada,
-                           BigDecimal resultadoEstimado, BigDecimal cajaNeta, BigDecimal lecheLitros, BigDecimal lechePorPagar) {}
+                           BigDecimal resultadoEstimado, BigDecimal cajaNeta, BigDecimal lecheLitros, BigDecimal porPagarProveedores) {}
 
     public record Cartera(BigDecimal saldoTotal, BigDecimal saldoVencido, Integer clientesConSaldo, Integer clientesEnMora) {}
 
     public record Inventario(BigDecimal valorProductos, Integer productosBajoMinimo, Integer productosAgotados,
                              BigDecimal valorInsumos, Integer insumosBajoMinimo, Integer lotesPorVencer) {}
 
-    /** Saldo historico por pagar a los lecheros (vw_saldo_proveedores), no solo de la quincena. */
-    public record Lecheros(BigDecimal saldoPorPagar, Integer proveedoresConSaldo) {}
+    /** Saldo historico por pagar a los proveedores (vw_saldo_proveedores), no solo de la quincena. */
+    public record Proveedores(BigDecimal saldoPorPagar, Integer proveedoresConSaldo) {}
 
     /** Las 5 primeras de vw_notificaciones (criticas primero); el total es el de la campana. */
     public record Alertas(Integer total, Integer criticas, List<Notificacion> principales) {}
@@ -46,7 +46,7 @@ public final class Tablero {
                        BigDecimal carteraSaldo, BigDecimal carteraVencido, Integer clientesConSaldo, Integer clientesEnMora,
                        BigDecimal valorProductos, Integer productosBajoMinimo, Integer productosAgotados,
                        BigDecimal valorInsumos, Integer insumosBajoMinimo, Integer lotesPorVencer,
-                       BigDecimal lecherosSaldo, Integer proveedoresConSaldo,
+                       BigDecimal proveedoresSaldo, Integer proveedoresConSaldo,
                        Integer alertasTotal, Integer alertasCriticas) {}
 
     private Tablero() {}

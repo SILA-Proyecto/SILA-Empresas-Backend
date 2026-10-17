@@ -26,7 +26,8 @@ public class ProduccionRepository {
 
     private static final String COLUMNAS_LOTE = """
             id_lote, codigo_lote, id_producto, producto, codigo_sku, unidad_medida, fecha_produccion,
-            litros_leche_usados, cantidad_obtenida, porcentaje_rendimiento, costo_total, costo_insumos, costo_leche, costo_unitario,
+            litros_leche_usados, cantidad_obtenida, porcentaje_rendimiento, costo_total, costo_insumos, costo_leche,
+            costo_por_litro, litros_esperados, diferencia_litros, costo_unitario,
             fecha_vencimiento, dias_restantes, nivel_alerta, usuario_registro, fecha_registro""";
     private static final String COLUMNAS_AJUSTE = """
             id_ajuste, id_producto, producto, codigo_sku, unidad_medida, tipo_ajuste, cantidad_delta,
@@ -60,20 +61,19 @@ public class ProduccionRepository {
     // ---------- escritura ----------
 
     /** OPERATIVO. Suma la cantidad obtenida al stock del producto; el codigo del lote lo genera la base. */
-    public long registrarLote(long idProducto, BigDecimal litros, BigDecimal cantidad, BigDecimal costoPorLitro,
+    public long registrarLote(long idProducto, BigDecimal litros, BigDecimal cantidad,
                               LocalDate fechaProduccion, LocalDate fechaVencimiento) {
         return sila.ejecutar(c -> {
-            try (CallableStatement s = c.prepareCall("{call pkg_produccion.sp_registrar_lote(?,?,?,?,?,?,?,?)}")) {
+            try (CallableStatement s = c.prepareCall("{call pkg_produccion.sp_registrar_lote(?,?,?,?,?,?,?)}")) {
                 s.setLong(1, idProducto);
                 s.setBigDecimal(2, litros);
                 s.setBigDecimal(3, cantidad);
-                s.setBigDecimal(4, costoPorLitro);
-                s.setDate(5, java.sql.Date.valueOf(fechaProduccion));
-                if (fechaVencimiento == null) s.setNull(6, Types.DATE); else s.setDate(6, java.sql.Date.valueOf(fechaVencimiento));
-                s.registerOutParameter(7, Types.NUMERIC);
-                s.registerOutParameter(8, Types.VARCHAR);
+                s.setDate(4, java.sql.Date.valueOf(fechaProduccion));
+                if (fechaVencimiento == null) s.setNull(5, Types.DATE); else s.setDate(5, java.sql.Date.valueOf(fechaVencimiento));
+                s.registerOutParameter(6, Types.NUMERIC);
+                s.registerOutParameter(7, Types.VARCHAR);
                 s.execute();
-                return s.getLong(7);
+                return s.getLong(6);
             }
         });
     }

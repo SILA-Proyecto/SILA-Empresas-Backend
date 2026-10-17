@@ -18,15 +18,14 @@ public class ProveedorRepository {
     public Long crear(CrearProveedorRequest r) {
         return sila.ejecutar(c -> {
             try (CallableStatement s = c.prepareCall(
-                    "{call pkg_catalogos.sp_crear_proveedor(?,?,?,?,?,?)}")) {
+                    "{call pkg_catalogos.sp_crear_proveedor(?,?,?,?,?)}")) {
                 s.setString(1, r.tipoDocumento());
                 s.setString(2, r.numeroDocumento());
                 s.setString(3, r.nombre());
                 s.setString(4, r.telefono());
-                s.setString(5, r.tipoProveedor());
-                s.registerOutParameter(6, Types.NUMERIC);
+                s.registerOutParameter(5, Types.NUMERIC);
                 s.execute();
-                return s.getLong(6);
+                return s.getLong(5);
             }
         });
     }

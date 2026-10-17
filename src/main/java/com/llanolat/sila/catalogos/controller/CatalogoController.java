@@ -68,12 +68,11 @@ public class CatalogoController {
     @GetMapping("/proveedores")
     public Page<ProveedorDto> listarProveedores(
             @RequestParam(required = false) String texto,
-            @RequestParam(name = "tipo_proveedor", required = false) String tipoProveedor,
             @RequestParam(required = false) Boolean activo,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
             @RequestParam(required = false) String sort) {
-        return service.listarProveedores(texto, tipoProveedor, activo, page, size, sort);
+        return service.listarProveedores(texto, activo, page, size, sort);
     }
 
     /** OPERATIVO. */

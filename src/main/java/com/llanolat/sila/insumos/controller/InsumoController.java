@@ -13,8 +13,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Insumos (azucar, envases...) con stock y costo promedio: /api/v1/insumos. Crear, editar, comprar y anular: ADMIN.
- * Los ajustes de resta (MERMA, DANO, VENCIMIENTO) los puede hacer OPERATIVO. Compras y ajustes (mueven stock y dinero) exigen Idempotency-Key.
+ * Materias primas (leche, azucar, envases...) con stock y costo promedio: /api/v1/insumos. Crear, editar y anular compras: ADMIN.
+ * Comprar: OPERATIVO si es la LECHE (con temperatura y acidez), ADMIN para las demas. Los ajustes de resta (MERMA, DANO,
+ * VENCIMIENTO) los puede hacer OPERATIVO. Compras y ajustes (mueven stock y dinero) exigen Idempotency-Key.
  */
 @RestController
 @RequestMapping("/api/v1/insumos")
@@ -69,20 +70,23 @@ public class InsumoController {
             @RequestParam(name = "id_insumo", required = false) Long idInsumo,
             @RequestParam(name = "id_proveedor", required = false) Long idProveedor,
             @RequestParam(required = false) String estado,
+            @RequestParam(name = "estado_calidad", required = false) String estadoCalidad,
+            @RequestParam(name = "id_periodo", required = false) Long idPeriodo,
+            @RequestParam(required = false) Boolean contado,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
             @RequestParam(required = false) String sort) {
-        return repo.compras(idInsumo, idProveedor, estado, desde, hasta, page, size, sort);
+        return repo.compras(idInsumo, idProveedor, estado, estadoCalidad, idPeriodo, contado, desde, hasta, page, size, sort);
     }
 
-    /** ADMIN. Suma al stock y recalcula el costo promedio ponderado. */
+    /** Suma al stock y recalcula el costo promedio ponderado. 201 tambien si la leche sale RECHAZADA (estado_calidad). */
     @PostMapping("/compras")
     @ResponseStatus(HttpStatus.CREATED)
     public Compra comprar(@Valid @RequestBody CrearCompraRequest r) { return service.comprar(r); }
 
-    /** ADMIN. Solo si el stock alcanza para devolver lo comprado (ORA-20002 si ya se gasto). */
+    /** ADMIN. Solo si el stock alcanza para devolver lo comprado (20002 si ya se gasto) y la quincena no queda pagada de mas (20006). */
     @PostMapping("/compras/{id}/anular")
     public Compra anular(@PathVariable long id, @Valid @RequestBody AnularCompraRequest r) {
         return service.anularCompra(id, r.motivo());

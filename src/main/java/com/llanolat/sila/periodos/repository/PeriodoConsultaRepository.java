@@ -28,7 +28,8 @@ public class PeriodoConsultaRepository {
             r.cartera_castigada, r.resultado_estimado,
             r.iva_ventas, r.total_vendido, r.ventas_contado, r.ventas_credito, r.cobrado_contado, r.cobrado_abonos,
             r.total_cobrado, r.cartera_pendiente, r.leche_litros, r.leche_litros_rechazados, r.leche_comprada,
-            r.leche_pagada, r.leche_por_pagar, r.pagos_proveedores_caja, r.compras_insumos, r.caja_neta""";
+            r.compras_materias_primas, r.compras_contado, r.compras_credito, r.pagado_proveedores, r.por_pagar_proveedores,
+            r.pagos_proveedores_caja, r.caja_neta""";
 
     private static final Map<String, String> ORDEN = Map.of(
             "id_periodo", "e.id_periodo", "anio", "e.anio", "mes", "e.mes",

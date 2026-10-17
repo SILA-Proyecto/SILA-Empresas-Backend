@@ -23,10 +23,11 @@ public class InsumoRepository {
 
     private static final String COLUMNAS_INSUMO = """
             id_insumo, codigo, nombre, unidad_medida, costo_promedio, stock_actual, stock_minimo, valor_inventario,
-            bajo_minimo, productos_que_lo_usan, activo, fecha_creacion, usuario_creacion""";
+            bajo_minimo, productos_que_lo_usan, activo, fecha_creacion, usuario_creacion, requiere_calidad""";
     private static final String COLUMNAS_COMPRA = """
             id_compra, id_insumo, codigo, insumo, unidad_medida, id_proveedor, proveedor, id_periodo, fecha, cantidad,
-            valor_total, costo_unitario, referencia, estado, motivo_anulacion, usuario_registro, fecha_registro""";
+            valor_total, costo_unitario, referencia, estado, motivo_anulacion, usuario_registro, fecha_registro,
+            contado, comprado_en, estado_calidad, temperatura, acidez, motivo_rechazo, requiere_calidad""";
     private static final String COLUMNAS_AJUSTE = """
             id_ajuste, id_insumo, codigo, insumo, unidad_medida, tipo_ajuste, cantidad_delta, valor_delta,
             observacion, usuario_registro, fecha_registro""";
@@ -41,7 +42,8 @@ public class InsumoRepository {
             "costo_promedio", "costo_promedio", "valor_inventario", "valor_inventario");
     private static final Map<String, String> ORDEN_COMPRAS = Map.of(
             "id_compra", "id_compra", "fecha", "fecha", "insumo", "insumo", "proveedor", "proveedor",
-            "valor_total", "valor_total", "cantidad", "cantidad", "estado", "estado");
+            "valor_total", "valor_total", "cantidad", "cantidad", "estado", "estado",
+            "temperatura", "temperatura", "acidez", "acidez");
     private static final Map<String, String> ORDEN_AJUSTES = Map.of(
             "id_ajuste", "id_ajuste", "fecha_registro", "fecha_registro", "insumo", "insumo",
             "tipo_ajuste", "tipo_ajuste", "cantidad_delta", "cantidad_delta");
@@ -96,18 +98,24 @@ public class InsumoRepository {
         });
     }
 
+    /** La base decide el rol (OPERATIVO para la leche, ADMIN para el resto) y la calidad; un rechazo de leche NO es un error. */
     public long registrarCompra(CrearCompraRequest r, LocalDate fecha) {
         return sila.ejecutar(c -> {
-            try (CallableStatement s = c.prepareCall("{call pkg_insumos.sp_registrar_compra(?,?,?,?,?,?,?)}")) {
+            try (CallableStatement s = c.prepareCall("{call pkg_insumos.sp_registrar_compra(?,?,?,?,?,?,?,?,?,?,?,?)}")) {
                 s.setLong(1, r.idInsumo());
                 if (r.idProveedor() == null) s.setNull(2, Types.NUMERIC); else s.setLong(2, r.idProveedor());
                 s.setBigDecimal(3, r.cantidad());
-                s.setBigDecimal(4, r.valorTotal());
+                if (r.valorTotal() == null) s.setNull(4, Types.NUMERIC); else s.setBigDecimal(4, r.valorTotal());
                 s.setString(5, r.referencia());
                 s.setDate(6, java.sql.Date.valueOf(fecha));
-                s.registerOutParameter(7, Types.NUMERIC);
+                if (r.contado() == null) s.setNull(7, Types.NUMERIC); else s.setInt(7, r.contado() ? 1 : 0);
+                s.setString(8, r.compradoEn());
+                if (r.temperatura() == null) s.setNull(9, Types.NUMERIC); else s.setBigDecimal(9, r.temperatura());
+                if (r.acidez() == null) s.setNull(10, Types.NUMERIC); else s.setBigDecimal(10, r.acidez());
+                s.registerOutParameter(11, Types.NUMERIC);
+                s.registerOutParameter(12, Types.VARCHAR);
                 s.execute();
-                return s.getLong(7);
+                return s.getLong(11);
             }
         });
     }
@@ -180,9 +188,13 @@ public class InsumoRepository {
                    .param("id", id).query(Compra.class).optional();
     }
 
-    public Page<Compra> compras(Long idInsumo, Long idProveedor, String estado, LocalDate desde, LocalDate hasta,
+    public Page<Compra> compras(Long idInsumo, Long idProveedor, String estado, String estadoCalidad, Long idPeriodo,
+                                Boolean contado, LocalDate desde, LocalDate hasta,
                                 Integer page, Integer size, String sort) {
         Filtro f = new Filtro();
+        if (estadoCalidad != null && !estadoCalidad.isBlank()) f.cuando("estado_calidad = :estadoCalidad").param("estadoCalidad", estadoCalidad.trim().toUpperCase());
+        if (idPeriodo != null) f.cuando("id_periodo = :idPeriodo").param("idPeriodo", idPeriodo);
+        if (contado != null) f.cuando("contado = :contado").param("contado", contado ? 1 : 0);
         if (idInsumo != null) f.cuando("id_insumo = :idInsumo").param("idInsumo", idInsumo);
         if (idProveedor != null) f.cuando("id_proveedor = :idProveedor").param("idProveedor", idProveedor);
         if (estado != null && !estado.isBlank()) f.cuando("estado = :estado").param("estado", estado.trim().toUpperCase());

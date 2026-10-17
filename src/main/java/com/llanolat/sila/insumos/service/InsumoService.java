@@ -48,14 +48,14 @@ public class InsumoService {
     public Compra comprar(CrearCompraRequest r) {
         LocalDate fecha = Fechas.deOHoy(r.fecha(), "fecha");
         long id = repo.registrarCompra(r, fecha);
-        archivos.alRegistrar("COMPRA_INSUMO", id);
+        archivos.alRegistrar("COMPRA", id);
         return repo.compra(id).orElseThrow(() -> SilaException.noEncontrado("La compra no existe."));
     }
 
     public Compra anularCompra(long id, String motivo) {
         repo.compra(id).orElseThrow(() -> SilaException.noEncontrado("La compra " + id + " no existe."));
         repo.anularCompra(id, motivo.trim());
-        archivos.alAnular("COMPRA_INSUMO", id);
+        archivos.alAnular("COMPRA", id);
         return repo.compra(id).orElseThrow();
     }
 

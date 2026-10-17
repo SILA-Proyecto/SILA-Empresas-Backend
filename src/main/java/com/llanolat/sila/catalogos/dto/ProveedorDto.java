@@ -8,6 +8,5 @@ public record ProveedorDto(
         String numeroDocumento,
         String nombre,
         String telefono,
-        String tipoProveedor,
         Boolean activo
 ) {}

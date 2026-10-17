@@ -19,15 +19,20 @@ public final class ProduccionDtos {
             Long idLote, String codigoLote, Long idProducto, String producto, String codigoSku, String unidadMedida,
             LocalDate fechaProduccion, BigDecimal litrosLecheUsados, BigDecimal cantidadObtenida,
             BigDecimal porcentajeRendimiento, BigDecimal costoTotal, BigDecimal costoInsumos, BigDecimal costoLeche,
+            BigDecimal costoPorLitro, BigDecimal litrosEsperados, BigDecimal diferenciaLitros,
             BigDecimal costoUnitario,
             LocalDate fechaVencimiento, Integer diasRestantes, String nivelAlerta,
             String usuarioRegistro, LocalDateTime fechaRegistro) {}
 
+    /**
+     * El costo ya NO se envia: la leche se descuenta del stock y se valora al costo promedio vigente (como las demas materias
+     * primas de la receta); {@code costo_por_litro} del lote es el resultado. {@code litros_leche_usados} son los litros REALES;
+     * si la receta lleva leche, {@code litros_esperados} y {@code diferencia_litros} los comparan.
+     */
     public record CrearLoteRequest(
             @NotNull Long idProducto,
             @NotNull @DecimalMin(value = "0.01", message = "debe ser mayor a cero") @Digits(integer = 8, fraction = 2) BigDecimal litrosLecheUsados,
             @NotNull @DecimalMin(value = "0.01", message = "debe ser mayor a cero") @Digits(integer = 10, fraction = 2) BigDecimal cantidadObtenida,
-            @NotNull @DecimalMin("0") @DecimalMax("1000000") @Digits(integer = 7, fraction = 2) BigDecimal costoPorLitro,
             LocalDate fechaProduccion,
             LocalDate fechaVencimiento) {}
 

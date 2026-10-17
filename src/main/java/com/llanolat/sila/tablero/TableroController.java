@@ -7,7 +7,7 @@ import com.llanolat.sila.tablero.Tablero.Cartera;
 import com.llanolat.sila.tablero.Tablero.Hoy;
 import com.llanolat.sila.tablero.Tablero.Indicadores;
 import com.llanolat.sila.tablero.Tablero.Inventario;
-import com.llanolat.sila.tablero.Tablero.Lecheros;
+import com.llanolat.sila.tablero.Tablero.Proveedores;
 import com.llanolat.sila.tablero.Tablero.Quincena;
 import com.llanolat.sila.tablero.Tablero.Respuesta;
 import com.llanolat.sila.tablero.Tablero.VentaDia;
@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Tablero: /api/v1/tablero. Solo lectura, cualquier usuario autenticado (el OPERATIVO ve lo mismo que el ADMIN).
- * Lee vistas existentes: vw_ventas_consolidadas, vw_comprobantes, vw_recepciones, vw_lotes, vw_dashboard_cartera,
+ * Lee vistas existentes: vw_ventas_consolidadas, vw_comprobantes, vw_compras_insumo, vw_lotes, vw_dashboard_cartera,
  * vw_inventario_valorizado, vw_productos, vw_insumos, vw_saldo_proveedores, vw_notificaciones y vw_cuentas_quincena.
  * Los indicadores salen en UNA consulta con subconsultas escalares; aparte van la quincena, las alertas y la serie.
  */
@@ -50,10 +50,10 @@ public class TableroController {
                     WHERE fecha = :hoy AND estado = 'VIGENTE' AND afecta_caja = 1 AND sentido = 'INGRESO') AS caja_ingresos,
                   (SELECT NVL(SUM(monto), 0) FROM vw_comprobantes
                     WHERE fecha = :hoy AND estado = 'VIGENTE' AND afecta_caja = 1 AND sentido = 'EGRESO') AS caja_egresos,
-                  (SELECT NVL(SUM(CASE WHEN estado_calidad = 'APROBADO' THEN litros END), 0) FROM vw_recepciones
-                    WHERE fecha = :hoy) AS litros_recibidos,
-                  (SELECT NVL(SUM(CASE WHEN estado_calidad = 'RECHAZADO' THEN litros END), 0) FROM vw_recepciones
-                    WHERE fecha = :hoy) AS litros_rechazados,
+                  (SELECT NVL(SUM(CASE WHEN estado_calidad = 'APROBADO' THEN cantidad END), 0) FROM vw_compras_insumo
+                    WHERE fecha = :hoy AND requiere_calidad = 1 AND estado = 'VIGENTE') AS litros_recibidos,
+                  (SELECT NVL(SUM(CASE WHEN estado_calidad = 'RECHAZADO' THEN cantidad END), 0) FROM vw_compras_insumo
+                    WHERE fecha = :hoy AND requiere_calidad = 1 AND estado = 'VIGENTE') AS litros_rechazados,
                   (SELECT COUNT(*) FROM vw_lotes WHERE fecha_produccion = :hoy) AS lotes_producidos,
                   (SELECT NVL(SUM(saldo_deudor), 0) FROM vw_dashboard_cartera) AS cartera_saldo,
                   (SELECT NVL(SUM(saldo_pendiente), 0) FROM vw_ventas_consolidadas
@@ -66,7 +66,7 @@ public class TableroController {
                   (SELECT NVL(SUM(valor_inventario), 0) FROM vw_insumos WHERE activo = 1) AS valor_insumos,
                   (SELECT COUNT(*) FROM vw_insumos WHERE activo = 1 AND bajo_minimo = 1) AS insumos_bajo_minimo,
                   (SELECT COUNT(*) FROM vw_lotes WHERE nivel_alerta IS NOT NULL AND dias_restantes >= 0) AS lotes_por_vencer,
-                  (SELECT NVL(SUM(CASE WHEN saldo > 0 THEN saldo END), 0) FROM vw_saldo_proveedores) AS lecheros_saldo,
+                  (SELECT NVL(SUM(CASE WHEN saldo > 0 THEN saldo END), 0) FROM vw_saldo_proveedores) AS proveedores_saldo,
                   (SELECT COUNT(*) FROM vw_saldo_proveedores WHERE saldo > 0) AS proveedores_con_saldo,
                   (SELECT COUNT(*) FROM vw_notificaciones) AS alertas_total,
                   (SELECT COUNT(*) FROM vw_notificaciones WHERE severidad = 'CRITICA') AS alertas_criticas
@@ -77,7 +77,7 @@ public class TableroController {
         Quincena quincena = jdbc.sql("""
                 SELECT id_periodo, anio, mes, quincena, fecha_inicio, fecha_fin, estado, ingresos_ventas, total_vendido,
                        total_cobrado, costo_produccion, gastos_operativos, cartera_castigada, resultado_estimado, caja_neta,
-                       leche_litros, leche_por_pagar
+                       leche_litros, por_pagar_proveedores
                   FROM vw_cuentas_quincena
                  WHERE :hoy BETWEEN fecha_inicio AND fecha_fin""")
                 .param("hoy", hoy).query(Quincena.class).optional().orElse(null);
@@ -105,7 +105,7 @@ public class TableroController {
                 new Cartera(i.carteraSaldo(), i.carteraVencido(), i.clientesConSaldo(), i.clientesEnMora()),
                 new Inventario(i.valorProductos(), i.productosBajoMinimo(), i.productosAgotados(),
                         i.valorInsumos(), i.insumosBajoMinimo(), i.lotesPorVencer()),
-                new Lecheros(i.lecherosSaldo(), i.proveedoresConSaldo()),
+                new Proveedores(i.proveedoresSaldo(), i.proveedoresConSaldo()),
                 new Alertas(i.alertasTotal(), i.alertasCriticas(), principales),
                 serie);
     }

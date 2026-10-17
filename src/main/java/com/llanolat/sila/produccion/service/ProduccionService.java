@@ -24,7 +24,7 @@ public class ProduccionService {
             throw SilaException.parametroInvalido("El vencimiento no puede ser anterior a la produccion.", "fecha_vencimiento");
         }
         long id = repo.registrarLote(r.idProducto(), r.litrosLecheUsados(), r.cantidadObtenida(),
-                r.costoPorLitro(), fecha, r.fechaVencimiento());
+                fecha, r.fechaVencimiento());
         return repo.lote(id).orElseThrow(() -> SilaException.noEncontrado("El lote no existe."));
     }
 

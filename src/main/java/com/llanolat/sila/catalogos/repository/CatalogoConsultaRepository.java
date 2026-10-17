@@ -19,8 +19,7 @@ import org.springframework.stereotype.Repository;
  * de aplicacion (no verifican rol).
  *
  * Los filtros son los del dashboard: `texto` (nombre o documento/SKU,
- * insensible a mayusculas y tildes), `activo` (booleano) y, en proveedores,
- * `tipo_proveedor`. Los campos de orden permitidos son los nombres que el
+ * insensible a mayusculas y tildes), `activo` (booleano). Los campos de orden permitidos son los nombres que el
  * dashboard conoce; cada uno se traduce a su columna.
  */
 @Repository
@@ -31,7 +30,7 @@ public class CatalogoConsultaRepository {
             telefono, direccion, limite_credito, saldo_deudor, activo""";
     private static final String PROVEEDORES = """
             id_proveedor, tipo_documento, numero_documento, nombre,
-            telefono, tipo_proveedor, activo""";
+            telefono, activo""";
     // La vista dice stock_actual; el dashboard, stock.
     private static final String PRODUCTOS = """
             id_producto, codigo_sku, nombre, unidad_medida,
@@ -44,7 +43,7 @@ public class CatalogoConsultaRepository {
     private static final Map<String, String> ORDEN_PROVEEDORES = Map.of(
             "id_proveedor", "id_proveedor", "tipo_documento", "tipo_documento",
             "numero_documento", "numero_documento", "nombre", "nombre", "telefono", "telefono",
-            "tipo_proveedor", "tipo_proveedor", "activo", "activo");
+            "activo", "activo");
     private static final Map<String, String> ORDEN_PRODUCTOS = Map.of(
             "id_producto", "id_producto", "codigo_sku", "codigo_sku", "nombre", "nombre",
             "unidad_medida", "unidad_medida", "precio_base", "precio_base",
@@ -76,14 +75,11 @@ public class CatalogoConsultaRepository {
 
     // ---------- proveedores ----------
 
-    public Page<ProveedorDto> proveedores(String texto, String tipoProveedor, Boolean activo,
+    public Page<ProveedorDto> proveedores(String texto, Boolean activo,
                                           Integer page, Integer size, String sort) {
         Filtro f = new Filtro();
         filtrarTexto(f, texto, "numero_documento LIKE '%' || :q || '%'");
         filtrarActivo(f, activo);
-        if (tipoProveedor != null && !tipoProveedor.isBlank()) {
-            f.cuando("tipo_proveedor = :tipoProveedor").param("tipoProveedor", tipoProveedor.trim().toUpperCase());
-        }
         Paginacion pag = Paginacion.de(page, size, sort, ORDEN_PROVEEDORES, "nombre,asc", "id_proveedor");
         return paginada.consultar(PROVEEDORES, "vw_proveedores", f, pag, ProveedorDto.class);
     }
