@@ -11,8 +11,8 @@ import com.llanolat.sila.archivos.Archivos.CrearCarpetaRequest;
 import com.llanolat.sila.archivos.Archivos.DescargaRequest;
 import com.llanolat.sila.archivos.Archivos.Explorador;
 import com.llanolat.sila.archivos.Archivos.OpcionesDescarga;
+import com.llanolat.sila.comprobantes.ComprobanteRepository;
 import com.llanolat.sila.infra.Page;
-import com.llanolat.sila.infra.SilaException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.io.IOException;
@@ -72,7 +72,7 @@ public class ArchivoController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
             @RequestParam(required = false) String sort) {
-        return repo.listar(origen, tipo, archivado, estadoDrive, idCarpeta, version, texto, desde, hasta, page, size, sort);
+        return repo.listar(service.origenListado(origen), tipo, archivado, estadoDrive, idCarpeta, version, texto, desde, hasta, page, size, sort);
     }
 
     /**
@@ -93,10 +93,7 @@ public class ArchivoController {
     /** Los PDF de un comprobante: el original y, si fue anulado, la version ANULADO. Lista vacia si no tiene PDF. */
     @GetMapping("/comprobante/{tipo}/{id}")
     public List<Archivo> deComprobante(@PathVariable String tipo, @PathVariable long id) {
-        String t = tipo.trim().toUpperCase();
-        if (!Set.of("VENTA", "ABONO", "PAGO_LECHERO", "COMPRA_INSUMO", "GASTO").contains(t)) {
-            throw SilaException.parametroInvalido("tipo debe ser VENTA, ABONO, PAGO_LECHERO, COMPRA_INSUMO o GASTO.", "tipo");
-        }
+        String t = ComprobanteRepository.validarTipo(tipo);
         return repo.deComprobante(t, id);
     }
 

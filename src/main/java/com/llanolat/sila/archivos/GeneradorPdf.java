@@ -339,8 +339,8 @@ public class GeneradorPdf {
             return switch (c.tipo()) {
                 case "VENTA" -> "Comprobante de venta";
                 case "ABONO" -> "Recibo de abono";
-                case "PAGO_LECHERO" -> "Comprobante de pago a lechero";
-                case "COMPRA_INSUMO" -> "Comprobante de compra de insumos";
+                case "PAGO_PROVEEDOR" -> "Comprobante de pago a proveedor";
+                case "COMPRA" -> "Comprobante de compra";
                 case "GASTO" -> "Comprobante de gasto";
                 default -> "Comprobante";
             };

@@ -47,7 +47,7 @@ public class ComprobanteController {
         return repo.resumen(tipo, sentido, idPeriodo, texto, desde, hasta);
     }
 
-    /** {tipo}: VENTA, ABONO (id = id_recibo), PAGO_LECHERO, COMPRA_INSUMO o GASTO. */
+    /** {tipo}: VENTA, ABONO (id = id_recibo), PAGO_PROVEEDOR, COMPRA o GASTO. */
     @GetMapping("/{tipo}/{id}")
     public Detalle detalle(@PathVariable String tipo, @PathVariable long id) {
         return repo.detalle(tipo, id);

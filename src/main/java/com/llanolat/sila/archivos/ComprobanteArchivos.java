@@ -62,7 +62,7 @@ public class ComprobanteArchivos {
         this.identidad = identidad;
     }
 
-    /** Tipos: VENTA, ABONO (id = id_recibo), PAGO_LECHERO, COMPRA_INSUMO, GASTO. */
+    /** Tipos: VENTA, ABONO (id = id_recibo), PAGO_PROVEEDOR, COMPRA, GASTO. */
     public void alRegistrar(String tipo, long id) {
         try {
             generar(null, tipo, id, "ORIGINAL", null);

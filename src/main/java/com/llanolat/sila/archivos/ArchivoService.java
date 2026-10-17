@@ -60,11 +60,23 @@ public class ArchivoService {
     // ----------------------------------------------------------- consulta
 
     public Archivo archivo(long id) {
-        return repo.archivo(id).orElseThrow(() -> SilaException.noEncontrado("El archivo no existe."));
+        return repo.archivo(id).filter(a -> visible(a.origen()))
+                .orElseThrow(() -> SilaException.noEncontrado("El archivo no existe."));
     }
 
     private Interno interno(long id) {
-        return repo.interno(id).orElseThrow(() -> SilaException.noEncontrado("El archivo no existe."));
+        return repo.interno(id).filter(i -> visible(i.origen()))
+                .orElseThrow(() -> SilaException.noEncontrado("El archivo no existe."));
+    }
+
+    /** El OPERATIVO solo ve los comprobantes que genera la aplicacion; lo que sube el ADMIN es del ADMIN. */
+    private boolean visible(String origen) {
+        return esAdmin() || "COMPROBANTE".equals(origen);
+    }
+
+    /** Origen con el que se filtra el listado: al OPERATIVO siempre COMPROBANTE, diga lo que diga el parametro. */
+    public String origenListado(String origen) {
+        return esAdmin() ? origen : "COMPROBANTE";
     }
 
     // ---------------------------------------------------------- lectura
@@ -244,9 +256,13 @@ public class ArchivoService {
                     new Entrada("TIPO", "Por tipo", n.get("TIPO")),
                     new Entrada("CLIENTE", "Por cliente", n.get("CLIENTE")),
                     new Entrada("PROVEEDOR", "Por proveedor", n.get("PROVEEDOR")),
-                    new Entrada("MANUAL", "Mis carpetas", n.get("MANUAL"))), vacia(page, size), false);
+                    new Entrada("MANUAL", "Mis carpetas", n.get("MANUAL"))).stream()
+                    .filter(e -> admin || !"MANUAL".equals(e.clave())).toList(), vacia(page, size), false);
         }
         String a = arbol.trim().toUpperCase(Locale.ROOT);
+        if ("MANUAL".equals(a) && !admin) {
+            throw SilaException.noEncontrado("La carpeta no existe.");
+        }
         if (r.stream().anyMatch(x -> x == null || x.isBlank() || x.length() > 100)) {
             throw SilaException.parametroInvalido("ruta invalida.", "ruta");
         }
@@ -312,6 +328,7 @@ public class ArchivoService {
     // ----------------------------------------------------------- carpetas
 
     public List<Carpeta> carpetas(Long idPadre, boolean incluirArchivadas) {
+        if (!esAdmin()) return List.of();
         return repo.carpetasManuales(idPadre, incluirArchivadas);
     }
 

@@ -25,9 +25,9 @@ public final class DocumentosDtos {
             LocalDateTime fechaCarga
     ) {}
 
-    /** tipo_entidad: FACTURA, NOTA_CREDITO o RECEPCION_LECHE (la base verifica que la entidad exista). mime_type por defecto application/pdf. */
+    /** tipo_entidad: FACTURA, NOTA_CREDITO o COMPRA (la base verifica que la entidad exista). mime_type por defecto application/pdf. */
     public record RegistrarDocumentoRequest(
-            @NotBlank String tipoEntidad,
+            @NotBlank @Pattern(regexp = "FACTURA|NOTA_CREDITO|COMPRA", message = "tipo_entidad debe ser FACTURA, NOTA_CREDITO o COMPRA") String tipoEntidad,
             @NotNull Long idEntidad,
             @NotBlank @Size(min = 3, max = 255) String nombreArchivo,
             @Size(max = 100) String mimeType

@@ -22,7 +22,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class ComprobanteRepository {
 
-    static final Set<String> TIPOS = Set.of("VENTA", "ABONO", "PAGO_LECHERO", "COMPRA_INSUMO", "GASTO");
+    static final Set<String> TIPOS = Set.of("VENTA", "ABONO", "PAGO_PROVEEDOR", "COMPRA", "GASTO");
     private static final String COLUMNAS = """
             tipo, id_documento, numero, sentido, afecta_caja, fecha, monto, id_tercero, tercero_tipo, tercero,
             descripcion, metodo_pago, referencia, estado, motivo_anulacion, id_periodo, usuario_registro""";
@@ -55,7 +55,7 @@ public class ComprobanteRepository {
                 COUNT(*) AS cantidad""", "vw_comprobantes", filtro(tipo, sentido, "VIGENTE", idPeriodo, texto, desde, hasta), Resumen.class);
     }
 
-    private static String validarTipo(String tipo) {
+    public static String validarTipo(String tipo) {
         String t = tipo == null ? "" : tipo.trim().toUpperCase();
         if (!TIPOS.contains(t)) throw SilaException.parametroInvalido("tipo debe ser uno de " + new java.util.TreeSet<>(TIPOS) + ".", "tipo");
         return t;
@@ -84,11 +84,11 @@ public class ComprobanteRepository {
                            CAST(NULL AS NUMBER) AS valor_unitario, monto AS valor
                       FROM vw_abonos_cartera WHERE id_recibo = :id ORDER BY id_abono""")
                     .param("id", id).query(Linea.class).list(), pagoUnico(c), null, null);
-            case "COMPRA_INSUMO" -> new Detalle(c, jdbc.sql("""
+            case "COMPRA" -> new Detalle(c, jdbc.sql("""
                     SELECT insumo || ' (' || unidad_medida || ')' AS concepto, cantidad, costo_unitario AS valor_unitario,
                            valor_total AS valor FROM vw_compras_insumo WHERE id_compra = :id""")
                     .param("id", id).query(Linea.class).list(), List.of(), null, null);
-            case "PAGO_LECHERO", "GASTO" -> new Detalle(c,
+            case "PAGO_PROVEEDOR", "GASTO" -> new Detalle(c,
                     List.of(new Linea(c.descripcion() == null ? c.numero() : c.descripcion(), null, null, c.monto())), pagoUnico(c), null, null);
             default -> throw new IllegalStateException("Tipo de comprobante sin detalle: " + t);
         };
