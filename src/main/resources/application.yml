@@ -20,7 +20,20 @@ spring:
       maximum-pool-size: 10
       minimum-idle: 2
       connection-timeout: 10000
+      # Conexiones recicladas antes de que un firewall/proxy las corte; aviso si una se queda tomada mas de 30 s.
+      max-lifetime: 1500000      # 25 min
+      keepalive-time: 300000       # 5 min
+      leak-detection-threshold: 30000
       pool-name: sila-pool
+
+  # Dos hilos para las tareas programadas: la subida a Drive (lenta) no debe frenar el reintento de PDF.
+  task:
+    scheduling:
+      pool:
+        size: 2
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
 
   servlet:
     multipart:
@@ -29,6 +42,8 @@ spring:
       max-request-size: 12MB
 
 server:
+  # Al apagar, termina las peticiones en curso (hasta 30 s) antes de cerrar.
+  shutdown: graceful
   # Solo esta maquina por defecto. Para probar desde otro equipo: SILA_BIND=0.0.0.0 (y nunca en produccion sin proxy y firewall).
   address: ${SILA_BIND:127.0.0.1}
   port: 8080
@@ -44,7 +59,7 @@ management:
 
 logging:
   level:
-    com.llanolat.sila: DEBUG
+    com.llanolat.sila: INFO     # para ver el detalle en desarrollo: LOGGING_LEVEL_COM_LLANOLAT_SILA=DEBUG
 
 sila:
   seguridad:

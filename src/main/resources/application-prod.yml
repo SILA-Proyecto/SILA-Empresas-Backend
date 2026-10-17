@@ -5,6 +5,13 @@ sila:
   seguridad:
     modo: jwt
     cookie-secure: true          # la cookie de renovacion solo viaja por HTTPS (el proxy termina TLS)
+  cors:
+    # Sin valor por defecto: en produccion el origen del dashboard se declara y el arranque falla si falta
+    # (asi nunca queda http://localhost:4200 permitido con credenciales).
+    origenes: ${SILA_CORS_ORIGENES}
+  archivos:
+    # Sin valor por defecto: el servicio no tiene "home" donde escribir; se declara el directorio (y va en el respaldo).
+    directorio: ${SILA_DOCS_DIR}
 
 server:
   address: 127.0.0.1             # solo el proxy inverso local llega al backend

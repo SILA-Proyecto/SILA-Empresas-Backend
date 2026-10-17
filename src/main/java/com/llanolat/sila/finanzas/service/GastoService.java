@@ -28,7 +28,7 @@ public class GastoService {
     }
 
     public Gasto anular(long id, String motivo) {
-        repo.anular(id, motivo);
+        repo.anular(id, motivo.trim());
         archivos.alAnular("GASTO", id);
         return gasto(id);
     }

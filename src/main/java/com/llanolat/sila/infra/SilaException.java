@@ -76,6 +76,10 @@ public class SilaException extends RuntimeException {
         if (mensaje.isBlank()) {
             mensaje = "Error de base de datos (ORA-" + codigo + ")";
         }
+        // Un valor que no cabe en la columna es un error del dato recibido, no un fallo interno.
+        if (codigo == 12899 || codigo == 1438) {
+            return new SilaException(PARAMETRO_INVALIDO, "Un valor es demasiado largo o demasiado grande para el campo.", referencia, e);
+        }
         return new SilaException(codigo, mensaje, referencia, e);
     }
 
