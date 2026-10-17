@@ -2,6 +2,9 @@ package com.llanolat.sila.cartera.repository;
 
 import com.llanolat.sila.cartera.dto.CarteraDtos.Abono;
 import com.llanolat.sila.cartera.dto.CarteraDtos.ClienteCartera;
+import com.llanolat.sila.cartera.dto.CarteraDtos.ClienteEdades;
+import com.llanolat.sila.cartera.dto.CarteraDtos.Edades;
+import com.llanolat.sila.cartera.dto.CarteraDtos.RangoEdad;
 import com.llanolat.sila.cartera.dto.CarteraDtos.Resumen;
 import com.llanolat.sila.cartera.dto.CarteraDtos.VentaPendiente;
 import com.llanolat.sila.infra.ConsultaPaginada;
@@ -87,6 +90,41 @@ public class CarteraRepository {
         Paginacion pag = Paginacion.de(page, size, sort, ORDEN_CLIENTES, "saldo_deudor,desc", "id_cliente");
         return paginada.consultar("id_cliente, cliente, telefono, limite_credito, saldo_deudor, cupo_disponible, dias_mora, estado_credito",
                 "vw_dashboard_cartera", f, pag, ClienteCartera.class);
+    }
+
+    private static final Map<String, String> ORDEN_EDADES = Map.of(
+            "cliente", "cliente", "saldo_total", "saldo_total", "dias_mora_max", "dias_mora_max", "al_dia", "al_dia",
+            "mora_leve", "mora_leve", "mora_media", "mora_media", "mora_alta", "mora_alta", "mora_critica", "mora_critica");
+
+    /** Cartera pendiente repartida por dias de mora: totales y numero de clientes en cada rango. */
+    public Edades edades() {
+        return jdbc.sql("""
+                SELECT %s AS fecha_corte,
+                       NVL(SUM(saldo_total), 0) AS total, COUNT(*) AS clientes,
+                       NVL(SUM(al_dia), 0) AS s0, COUNT(CASE WHEN al_dia > 0 THEN 1 END) AS c0,
+                       NVL(SUM(mora_leve), 0) AS s1, COUNT(CASE WHEN mora_leve > 0 THEN 1 END) AS c1,
+                       NVL(SUM(mora_media), 0) AS s2, COUNT(CASE WHEN mora_media > 0 THEN 1 END) AS c2,
+                       NVL(SUM(mora_alta), 0) AS s3, COUNT(CASE WHEN mora_alta > 0 THEN 1 END) AS c3,
+                       NVL(SUM(mora_critica), 0) AS s4, COUNT(CASE WHEN mora_critica > 0 THEN 1 END) AS c4
+                  FROM vw_cartera_edades""".formatted(HOY_CO))
+                   .query((rs, i) -> new Edades(rs.getDate("fecha_corte").toLocalDate(), rs.getBigDecimal("total"), rs.getLong("clientes"), List.of(
+                           new RangoEdad("AL_DIA", "Al dia (no vencida)", rs.getBigDecimal("s0"), rs.getLong("c0")),
+                           new RangoEdad("MORA_1_15", "Mora de 1 a 15 dias", rs.getBigDecimal("s1"), rs.getLong("c1")),
+                           new RangoEdad("MORA_16_30", "Mora de 16 a 30 dias", rs.getBigDecimal("s2"), rs.getLong("c2")),
+                           new RangoEdad("MORA_31_60", "Mora de 31 a 60 dias", rs.getBigDecimal("s3"), rs.getLong("c3")),
+                           new RangoEdad("MORA_MAS_60", "Mora de mas de 60 dias", rs.getBigDecimal("s4"), rs.getLong("c4")))))
+                   .single();
+    }
+
+    public Page<ClienteEdades> edadesPorCliente(String texto, Integer page, Integer size, String sort) {
+        Filtro f = new Filtro();
+        if (texto != null && !texto.isBlank()) {
+            f.cuando(Texto.comoSinAcentos("cliente")).param("q", texto.trim())
+             .param("conAcento", Texto.ACENTOS).param("sinAcento", Texto.SIN_ACENTOS);
+        }
+        Paginacion pag = Paginacion.de(page, size, sort, ORDEN_EDADES, "saldo_total,desc", "id_cliente");
+        return paginada.consultar("id_cliente, cliente, telefono, saldo_total, ventas_pendientes, dias_mora_max, al_dia, mora_leve, mora_media, mora_alta, mora_critica",
+                "vw_cartera_edades", f, pag, ClienteEdades.class);
     }
 
     public Resumen resumen() {

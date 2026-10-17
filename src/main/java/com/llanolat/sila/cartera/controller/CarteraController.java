@@ -5,6 +5,8 @@ import com.llanolat.sila.cartera.dto.CarteraDtos.AbonoRequest;
 import com.llanolat.sila.cartera.dto.CarteraDtos.CastigoRequest;
 import com.llanolat.sila.cartera.dto.CarteraDtos.CastigoResultado;
 import com.llanolat.sila.cartera.dto.CarteraDtos.ClienteCartera;
+import com.llanolat.sila.cartera.dto.CarteraDtos.ClienteEdades;
+import com.llanolat.sila.cartera.dto.CarteraDtos.Edades;
 import com.llanolat.sila.cartera.dto.CarteraDtos.Recibo;
 import com.llanolat.sila.cartera.dto.CarteraDtos.Resumen;
 import com.llanolat.sila.cartera.dto.CarteraDtos.VentaPendiente;
@@ -44,6 +46,22 @@ public class CarteraController {
             @RequestParam(required = false) Integer size,
             @RequestParam(required = false) String sort) {
         return repo.clientes(texto, estadoCredito, soloConDeuda, moraMinima, page, size, sort);
+    }
+
+    /** Cartera pendiente por dias de mora (al dia, 1-15, 16-30, 31-60, mas de 60): totales y numero de clientes por rango. */
+    @GetMapping("/edades")
+    public Edades edades() {
+        return repo.edades();
+    }
+
+    /** Lo mismo por cliente, para ver quien debe cuanto y desde hace cuanto. sort: cliente, saldo_total, dias_mora_max, mora_*. */
+    @GetMapping("/edades/clientes")
+    public Page<ClienteEdades> edadesPorCliente(
+            @RequestParam(required = false) String texto,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String sort) {
+        return repo.edadesPorCliente(texto, page, size, sort);
     }
 
     @GetMapping("/resumen")

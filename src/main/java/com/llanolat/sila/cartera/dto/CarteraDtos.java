@@ -26,6 +26,16 @@ public final class CarteraDtos {
             Long idAbono, Long idRecibo, Long idCliente, String cliente, Long idVenta, LocalDate fechaAbono,
             BigDecimal monto, String metodoPago, String referenciaPago, String usuarioRegistro) {}
 
+    /** Lo que debe un cliente repartido por dias de mora: al dia (no vencida), leve 1-15, media 16-30, alta 31-60, critica mas de 60. */
+    public record ClienteEdades(
+            Long idCliente, String cliente, String telefono, BigDecimal saldoTotal, Long ventasPendientes, Integer diasMoraMax,
+            BigDecimal alDia, BigDecimal moraLeve, BigDecimal moraMedia, BigDecimal moraAlta, BigDecimal moraCritica) {}
+
+    public record RangoEdad(String clave, String etiqueta, BigDecimal saldo, Long clientes) {}
+
+    /** Cartera total por rango de mora (a hoy, hora de Colombia). */
+    public record Edades(LocalDate fechaCorte, BigDecimal total, Long clientes, List<RangoEdad> rangos) {}
+
     public record Resumen(BigDecimal totalCartera, Long clientesConDeuda, Long clientesEnMora, BigDecimal carteraVencida) {}
 
     /** El recibo de un abono: como se repartio (de la venta mas antigua a la mas nueva) y lo que queda debiendo. */
