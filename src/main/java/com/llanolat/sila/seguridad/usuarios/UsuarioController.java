@@ -5,12 +5,20 @@ import com.llanolat.sila.seguridad.usuarios.UsuarioDtos.ActualizarUsuarioRequest
 import com.llanolat.sila.seguridad.usuarios.UsuarioDtos.CambiarEstadoRequest;
 import com.llanolat.sila.seguridad.usuarios.UsuarioDtos.CrearUsuarioRequest;
 import com.llanolat.sila.seguridad.usuarios.UsuarioDtos.UsuarioConClaveTemporal;
+import com.llanolat.sila.seguridad.auth.ConfirmacionSegundoFactor;
+import com.llanolat.sila.seguridad.usuarios.UsuarioDtos.CodigoRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import static com.llanolat.sila.infra.Peticion.agente;
+import static com.llanolat.sila.infra.Peticion.ip;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Administracion de usuarios: /api/v1/usuarios. TODO es ADMIN (la cadena de seguridad lo
+ * Administracion de usuarios: /api/v1/usuarios. TODO es ADMIN. Crear, cambiar el rol, restablecer la clave y restablecer el
+ * segundo factor piden ademas el codigo del segundo factor de quien lo hace (campo {@code codigo}). TODO es ADMIN (la cadena de seguridad lo
  * exige y, ademas, cada procedimiento de pkg_usuarios lo verifica en la base).
  * Ver docs/CONTRATO_BACKEND.md.
  */
@@ -19,8 +27,12 @@ import org.springframework.web.bind.annotation.*;
 class UsuarioController {
 
     private final UsuarioService service;
+    private final ConfirmacionSegundoFactor confirmacion;
 
-    UsuarioController(UsuarioService service) { this.service = service; }
+    UsuarioController(UsuarioService service, ConfirmacionSegundoFactor confirmacion) {
+        this.service = service;
+        this.confirmacion = confirmacion;
+    }
 
     @GetMapping
     Page<UsuarioDto> listar(
@@ -41,12 +53,14 @@ class UsuarioController {
     /** Crea el usuario con una clave temporal (se devuelve una sola vez); debe cambiarla al entrar. */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    UsuarioConClaveTemporal crear(@Valid @RequestBody CrearUsuarioRequest r) {
+    UsuarioConClaveTemporal crear(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CrearUsuarioRequest r, HttpServletRequest req) {
+        confirmacion.exigir(jwt, r.codigo(), ip(req), agente(req));
         return service.crear(r);
     }
 
     @PutMapping("/{id}")
-    UsuarioDto actualizar(@PathVariable long id, @Valid @RequestBody ActualizarUsuarioRequest r) {
+    UsuarioDto actualizar(@AuthenticationPrincipal Jwt jwt, @PathVariable long id, @Valid @RequestBody ActualizarUsuarioRequest r, HttpServletRequest req) {
+        confirmacion.exigir(jwt, r.codigo(), ip(req), agente(req));
         return service.actualizar(id, r);
     }
 
@@ -62,7 +76,9 @@ class UsuarioController {
     }
 
     @PostMapping("/{id}/restablecer-clave")
-    UsuarioConClaveTemporal restablecerClave(@PathVariable long id) {
+    UsuarioConClaveTemporal restablecerClave(@AuthenticationPrincipal Jwt jwt, @PathVariable long id,
+                                             @Valid @RequestBody CodigoRequest r, HttpServletRequest req) {
+        confirmacion.exigir(jwt, r.codigo(), ip(req), agente(req));
         return service.restablecerClave(id);
     }
 
@@ -79,7 +95,9 @@ class UsuarioController {
     }
 
     @PostMapping("/{id}/restablecer-mfa")
-    UsuarioDto restablecerMfa(@PathVariable long id) {
+    UsuarioDto restablecerMfa(@AuthenticationPrincipal Jwt jwt, @PathVariable long id,
+                              @Valid @RequestBody CodigoRequest r, HttpServletRequest req) {
+        confirmacion.exigir(jwt, r.codigo(), ip(req), agente(req));
         return service.restablecerMfa(id);
     }
 }

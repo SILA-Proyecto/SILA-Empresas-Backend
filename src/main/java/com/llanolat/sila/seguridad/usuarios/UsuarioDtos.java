@@ -13,12 +13,17 @@ final class UsuarioDtos {
                     message = "3 a 100 caracteres en minuscula: letras, numeros, punto, guion, guion bajo o @.") String usuario,
             @NotBlank @Size(min = 3, max = 120) String nombre,
             @NotBlank @Size(max = 150) @Pattern(regexp = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", message = "Correo invalido.") String email,
-            @NotNull @Pattern(regexp = "ADMIN|OPERATIVO", message = "Debe ser ADMIN u OPERATIVO.") String rol) {}
+            @NotNull @Pattern(regexp = "ADMIN|OPERATIVO", message = "Debe ser ADMIN u OPERATIVO.") String rol,
+            @NotBlank @Size(max = 20) String codigo) {}
 
     record ActualizarUsuarioRequest(
             @NotBlank @Size(min = 3, max = 120) String nombre,
             @NotBlank @Size(max = 150) @Pattern(regexp = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", message = "Correo invalido.") String email,
-            @NotNull @Pattern(regexp = "ADMIN|OPERATIVO", message = "Debe ser ADMIN u OPERATIVO.") String rol) {}
+            @NotNull @Pattern(regexp = "ADMIN|OPERATIVO", message = "Debe ser ADMIN u OPERATIVO.") String rol,
+            @NotBlank @Size(max = 20) String codigo) {}
+
+    /** Acciones sensibles sin otros datos: el codigo del segundo factor de quien las hace. */
+    record CodigoRequest(@NotBlank @Size(max = 20) String codigo) {}
 
     record CambiarEstadoRequest(@NotNull Boolean activo) {}
 

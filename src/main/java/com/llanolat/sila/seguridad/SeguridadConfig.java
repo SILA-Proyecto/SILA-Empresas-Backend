@@ -64,7 +64,9 @@ public class SeguridadConfig {
                 .requestMatchers(HttpMethod.POST, "/api/v1/archivos", "/api/v1/archivos/*/archivar", "/api/v1/archivos/carpetas",
                                  "/api/v1/archivos/carpetas/*/archivar", "/api/v1/archivos/drive/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/v1/archivos/accesos", "/api/v1/archivos/drive/**").hasRole("ADMIN")
-                .requestMatchers("/api/v1/usuarios/**", "/api/v1/auditoria/**").hasRole("ADMIN")
+                .requestMatchers("/api/v1/usuarios/**", "/api/v1/auditoria/**", "/api/v1/reportes/**").hasRole("ADMIN")
+                // Estado de la copia en Drive: solo el ADMIN (el sincronizador del sistema lo hace por su cuenta).
+                .requestMatchers(HttpMethod.POST, "/api/v1/documentos/*/subido", "/api/v1/documentos/*/error").hasRole("ADMIN")
                 // Escrituras reservadas a ADMIN. La base las verifica igual; esto responde antes y de forma uniforme.
                 .requestMatchers(HttpMethod.POST, "/api/v1/periodos/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH, "/api/v1/periodos/**", "/api/v1/catalogos/**").hasRole("ADMIN")
@@ -73,12 +75,13 @@ public class SeguridadConfig {
                 .requestMatchers(HttpMethod.POST, "/api/v1/ventas/*/anular", "/api/v1/cartera/castigos").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/v1/precios-cliente", "/api/v1/parametros/*").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH, "/api/v1/precios-cliente/**").hasRole("ADMIN")
-                // Insumos: los ajustes de resta los hace OPERATIVO (la base exige ADMIN para las correcciones); lo demas es ADMIN.
-                .requestMatchers(HttpMethod.POST, "/api/v1/insumos/ajustes").hasAuthority("TIPO_ACCESO")
+                // Materias primas: los ajustes de resta y la recepcion de leche los hace OPERATIVO (la base exige ADMIN para las
+                // correcciones y para las compras de las demas materias primas); lo demas es ADMIN.
+                .requestMatchers(HttpMethod.POST, "/api/v1/insumos/ajustes", "/api/v1/insumos/compras").hasAuthority("TIPO_ACCESO")
                 .requestMatchers(HttpMethod.POST, "/api/v1/insumos/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/v1/insumos/**", "/api/v1/catalogos/productos/*/receta").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH, "/api/v1/insumos/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.POST, "/api/v1/acopio/precios", "/api/v1/acopio/pagos", "/api/v1/acopio/pagos/*/anular", "/api/v1/finanzas/gastos/*/anular").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/v1/cuentas-proveedores/precios", "/api/v1/cuentas-proveedores/pagos", "/api/v1/cuentas-proveedores/pagos/*/anular", "/api/v1/insumos/compras/*/anular", "/api/v1/finanzas/gastos/*/anular").hasRole("ADMIN")
                 .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                 .anyRequest().hasAuthority("TIPO_ACCESO"));
         return http.build();

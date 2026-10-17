@@ -256,6 +256,12 @@ class AuthService {
         return completarSiAlDia(cred, ip, userAgent);
     }
 
+    /** Confirma con el segundo factor una accion sensible de otro modulo (administracion de usuarios). */
+    void confirmarAccion(Jwt jwt, String codigo, String ip, String userAgent) {
+        exigirAlgunTipo(jwt, Tipo.ACCESO);
+        exigirSegundoFactor(cargar(jwt), codigo, ip, userAgent);
+    }
+
     /** Agregar un dispositivo es una accion sensible: pide el codigo de la app (o uno de respaldo). */
     String opcionesPasskeyRegistro(Jwt jwt, String codigo, String origen, String ip, String userAgent) {
         exigirAlgunTipo(jwt, Tipo.ACCESO);
