@@ -437,17 +437,15 @@ try:
         ('PATCH', f'/catalogos/productos/{G}/precio', {'precio_base': 1, 'tarifa_iva': 0}, {401}, {403}, {404, 409}),
         ('POST', '/periodos/anio/1999', None, {401}, {403}, {400}),
         ('PATCH', f'/periodos/{G}/estado', {'estado': 'CERRADA'}, {401}, {403}, {404}),
-        ('GET', '/acopio/recepciones?size=1', None, {401}, {200}, {200}),
         ('GET', '/acopio/umbrales', None, {401}, {200}, {200}),
         ('GET', '/acopio/calidad?size=1', None, {401}, {200}, {200}),
-        ('GET', '/acopio/pago-lecheros?size=1', None, {401}, {200}, {200}),
-        ('POST', '/acopio/recepciones', {}, {401}, {400}, {400}),
-        ('GET', '/acopio/precios?size=1', None, {401}, {200}, {200}),
-        ('GET', '/acopio/saldos?size=1', None, {401}, {200}, {200}),
-        ('GET', '/acopio/pagos?size=1', None, {401}, {200}, {200}),
-        ('POST', '/acopio/precios', {}, {401}, {403}, {400}),
-        ('POST', '/acopio/pagos', {}, {401}, {403}, {400}),
-        ('POST', f'/acopio/pagos/{G}/anular', {'motivo': 'Motivo de prueba largo'}, {401}, {403}, {404}),
+        ('GET', '/cuentas-proveedores/resumen?size=1', None, {401}, {200}, {200}),
+        ('GET', '/cuentas-proveedores/precios?size=1', None, {401}, {200}, {200}),
+        ('GET', '/cuentas-proveedores/saldos?size=1', None, {401}, {200}, {200}),
+        ('GET', '/cuentas-proveedores/pagos?size=1', None, {401}, {200}, {200}),
+        ('POST', '/cuentas-proveedores/precios', {}, {401}, {403}, {400}),
+        ('POST', '/cuentas-proveedores/pagos', {}, {401}, {403}, {400}),
+        ('POST', f'/cuentas-proveedores/pagos/{G}/anular', {'motivo': 'Motivo de prueba largo'}, {401}, {403}, {404}),
         ('GET', '/produccion/lotes?size=1', None, {401}, {200}, {200}),
         ('GET', '/produccion/ajustes?size=1', None, {401}, {200}, {200}),
         ('POST', '/produccion/lotes', {}, {401}, {400}, {400}),
@@ -477,7 +475,7 @@ try:
         ('POST', '/insumos', {}, {401}, {403}, {400}),
         ('PUT', f'/insumos/{G}', {'nombre': 'Nombre Valido', 'unidad_medida': 'KG', 'stock_minimo': 0}, {401}, {403}, {404}),
         ('PATCH', f'/insumos/{G}/estado', {'activo': True}, {401}, {403}, {404}),
-        ('POST', '/insumos/compras', {}, {401}, {403}, {400}),
+        ('POST', '/insumos/compras', {}, {401}, {400}, {400}),
         ('POST', f'/insumos/compras/{G}/anular', {'motivo': 'Motivo de prueba largo'}, {401}, {403}, {404}),
         ('POST', '/insumos/ajustes', {}, {401}, {400}, {400}),
         ('GET', f'/catalogos/productos/{G}/receta', None, {401}, {404}, {404}),
@@ -491,12 +489,12 @@ try:
         ('GET', '/documentos?size=1', None, {401}, {200}, {200}),
         ('GET', f'/documentos/{G}', None, {401}, {404}, {404}),
         ('POST', '/documentos', {}, {401}, {400}, {400}),
-        ('POST', f'/documentos/{G}/subido', {}, {401}, {400}, {400}),
-        ('POST', f'/documentos/{G}/error', {}, {401}, {400}, {400}),
+        ('POST', f'/documentos/{G}/subido', {}, {401}, {403}, {400}),
+        ('POST', f'/documentos/{G}/error', {}, {401}, {403}, {400}),
         # Archivos (PDF de comprobantes, archivos del ADMIN, carpetas, Drive). Subir = multipart: con cuerpo JSON el ADMIN llega al 415.
         ('GET', '/archivos?size=1', None, {401}, {200}, {200}),
         ('GET', '/archivos/explorador', None, {401}, {200}, {200}),
-        ('GET', '/archivos/explorador?arbol=MANUAL', None, {401}, {200}, {200}),
+        ('GET', '/archivos/explorador?arbol=MANUAL', None, {401}, {404}, {200}),
         ('GET', '/archivos/explorador?arbol=TIPO&ruta=VENTA', None, {401}, {200, 404}, {200, 404}),
         ('GET', '/archivos/carpetas', None, {401}, {200}, {200}),
         ('GET', f'/archivos/comprobante/VENTA/{G}', None, {401}, {200}, {200}),
@@ -525,14 +523,17 @@ try:
         ('GET', '/auditoria/errores?size=1', None, {401}, {403}, {200}),
         ('GET', f'/usuarios/{G}/sesiones', None, {401}, {403}, {404}),
         ('POST', f'/usuarios/{G}/cerrar-sesiones', None, {401}, {403}, {404}),
+        ('GET', '/cartera/edades', None, {401}, {200}, {200}),
+        ('GET', '/cartera/edades/clientes?size=1', None, {401}, {200}, {200}),
+        ('GET', '/reportes/margen', None, {401}, {403}, {200}),
         ('GET', '/usuarios?size=1', None, {401}, {403}, {200}),
         ('GET', f'/usuarios/{G}', None, {401}, {403}, {404}),
         ('POST', '/usuarios', {}, {401}, {403}, {400}),
-        ('PUT', f'/usuarios/{G}', {'nombre': 'Nombre Valido', 'email': 'a@b.co', 'rol': 'OPERATIVO'}, {401}, {403}, {404}),
+        ('PUT', f'/usuarios/{G}', {'nombre': 'Nombre Valido', 'email': 'a@b.co', 'rol': 'OPERATIVO'}, {401}, {403}, {400}),   # sin codigo del 2do factor
         ('PATCH', f'/usuarios/{G}/estado', {'activo': True}, {401}, {403}, {404}),
         ('POST', f'/usuarios/{G}/desbloquear', None, {401}, {403}, {404}),
-        ('POST', f'/usuarios/{G}/restablecer-clave', None, {401}, {403}, {404}),
-        ('POST', f'/usuarios/{G}/restablecer-mfa', None, {401}, {403}, {404}),
+        ('POST', f'/usuarios/{G}/restablecer-clave', None, {401}, {403}, {400}),
+        ('POST', f'/usuarios/{G}/restablecer-mfa', None, {401}, {403}, {400}),
     ]
     fallos = []
     for m, ruta, cuerpo, e_none, e_op, e_adm in MATRIZ:
@@ -544,10 +545,29 @@ try:
 
     # ------------------------------------------------------------
     seccion('8. Revocacion inmediata')
+    # Crear usuarios, cambiar roles y restablecer claves/MFA piden el codigo del 2do factor del ADMIN: se gastan codigos de respaldo.
+    r = llamar('POST', '/auth/mfa/respaldo/regenerar', acc_admin, {'clave_actual': N_ADMIN, 'codigo': nuevos[9]})
+    reserva = list(r.json().get('codigos_respaldo', [])) if r.status_code == 200 else []
+    chk('reserva de codigos de respaldo para las acciones sensibles de usuarios', len(reserva) == 10, r.text)
+    def cod():
+        if len(reserva) == 1:   # el ultimo codigo se usa para pedir 10 nuevos (regenerar invalida los anteriores)
+            rr = llamar('POST', '/auth/mfa/respaldo/regenerar', acc_admin, {'clave_actual': N_ADMIN, 'codigo': reserva.pop(0)})
+            reserva.extend(rr.json().get('codigos_respaldo', []))
+        return reserva.pop(0)
+    def sin_fallos():
+        sql_dueno(f"UPDATE usuarios_app SET bloqueado_hasta = NULL, intentos_fallidos = 0 WHERE usuario = '{U_ADMIN}';\nCOMMIT;\n")
+    sin_fallos()   # las secciones anteriores dejaron intentos fallidos: dos codigos malos mas bloquearian la cuenta de prueba
+    r = llamar('POST', '/usuarios', acc_admin, {'usuario': f't.sin.{SUF}', 'nombre': 'Prueba sin codigo', 'email': f't.sin.{SUF}@example.com', 'rol': 'OPERATIVO'})
+    chk('crear un usuario sin el codigo del segundo factor -> 400', r.status_code == 400 and 'codigo' in r.json().get('fields', {}), r.text)
+    r = llamar('POST', '/usuarios', acc_admin, {'usuario': f't.sin.{SUF}', 'nombre': 'Prueba sin codigo', 'email': f't.sin.{SUF}@example.com', 'rol': 'OPERATIVO', 'codigo': '123456'})
+    chk('crear un usuario con un codigo incorrecto -> 401 y no se crea', r.status_code == 401, r.text)
+    chk('restablecer la clave de otro sin codigo -> 400', llamar('POST', f'/usuarios/{G}/restablecer-clave', acc_admin, {}).status_code == 400)
+    chk('restablecer el segundo factor de otro con codigo incorrecto -> 401', llamar('POST', f'/usuarios/{G}/restablecer-mfa', acc_admin, {'codigo': '123456'}).status_code == 401)
+    sin_fallos()
     u_rev, u_rol = f't.rev.{SUF}', f't.rol.{SUF}'
     creados = {}
     for u, rol in ((u_rev, 'OPERATIVO'), (u_rol, 'OPERATIVO')):
-        r = llamar('POST', '/usuarios', acc_admin, {'usuario': u, 'nombre': f'Prueba {u}', 'email': f'{u}@example.com', 'rol': rol})
+        r = llamar('POST', '/usuarios', acc_admin, {'usuario': u, 'nombre': f'Prueba {u}', 'email': f'{u}@example.com', 'rol': rol, 'codigo': cod()})
         chk(f'ADMIN crea {u} (201, clave temporal de 16)', r.status_code == 201 and len(r.json().get('clave_temporal', '')) == 16, r.text)
         creados[u] = r.json()
     tok_rev = entrar_operativo(u_rev, creados[u_rev]['clave_temporal'], 'Rev-' + secrets.token_hex(6) + '!')
@@ -558,14 +578,15 @@ try:
     chk('ADMIN desactiva al usuario', r.status_code == 200 and r.json()['activo'] is False, r.text)
     chk('su token (aun vigente 15 min) deja de servir AL INSTANTE -> 401', llamar('GET', '/catalogos/clientes?size=1', tok_rev).status_code == 401)
     uu = creados[u_rol]['usuario']
-    r = llamar('PUT', f"/usuarios/{uu['id_usuario']}", acc_admin, {'nombre': uu['nombre'], 'email': uu['email'], 'rol': 'ADMIN'})
+    r = llamar('PUT', f"/usuarios/{uu['id_usuario']}", acc_admin, {'nombre': uu['nombre'], 'email': uu['email'], 'rol': 'ADMIN', 'codigo': cod()})
     chk('ADMIN le cambia el rol', r.status_code == 200 and r.json()['rol'] == 'ADMIN', r.text)
     chk('el token con el rol anterior deja de servir AL INSTANTE -> 401', llamar('GET', '/catalogos/clientes?size=1', tok_rol).status_code == 401)
     me = llamar('GET', '/auth/yo', acc_admin).json()['id_usuario']
     for etiqueta, m, ruta, cuerpo in (('desactivarse a si mismo', 'PATCH', f'/usuarios/{me}/estado', {'activo': False}),
-                                     ('quitarse el rol ADMIN', 'PUT', f'/usuarios/{me}', {'nombre': 'Prueba Admin', 'email': f'{U_ADMIN}@example.com', 'rol': 'OPERATIVO'}),
-                                     ('restablecer su propia clave', 'POST', f'/usuarios/{me}/restablecer-clave', None),
-                                     ('quitarse el segundo factor', 'POST', f'/usuarios/{me}/restablecer-mfa', None)):
+                                     ('quitarse el rol ADMIN', 'PUT', f'/usuarios/{me}', {'nombre': 'Prueba Admin', 'email': f'{U_ADMIN}@example.com', 'rol': 'OPERATIVO', 'codigo': '@COD@'}),
+                                     ('restablecer su propia clave', 'POST', f'/usuarios/{me}/restablecer-clave', {'codigo': '@COD@'}),
+                                     ('quitarse el segundo factor', 'POST', f'/usuarios/{me}/restablecer-mfa', {'codigo': '@COD@'})):
+        cuerpo = {k: (cod() if v == '@COD@' else v) for k, v in cuerpo.items()} if cuerpo and any(v == '@COD@' for v in cuerpo.values()) else cuerpo
         chk(f'nadie puede {etiqueta} -> 409', llamar(m, ruta, acc_admin, cuerpo).status_code == 409)
 
     # ------------------------------------------------------------
@@ -600,7 +621,7 @@ try:
     # ------------------------------------------------------------
     seccion('9b. Sesiones')
     u_ses = f't.ses.{SUF}'
-    r = llamar('POST', '/usuarios', acc_admin, {'usuario': u_ses, 'nombre': 'Prueba Sesiones', 'email': f'{u_ses}@example.com', 'rol': 'OPERATIVO'})
+    r = llamar('POST', '/usuarios', acc_admin, {'usuario': u_ses, 'nombre': 'Prueba Sesiones', 'email': f'{u_ses}@example.com', 'rol': 'OPERATIVO', 'codigo': cod()})
     id_ses, pw_ses = r.json()['usuario']['id_usuario'], r.json()['clave_temporal']
     nueva_ses = 'Ses-' + secrets.token_hex(6) + '!'
     tok_a = entrar_operativo(u_ses, pw_ses, nueva_ses)                       # sesion A (cambiar clave la abre)
@@ -651,78 +672,100 @@ try:
     chk('log de errores accesible', llamar('GET', '/auditoria/errores?size=1', acc_admin).status_code == 200)
     chk('un OPERATIVO no ve la auditoria -> 403', llamar('GET', '/auditoria/accesos', acc_oper).status_code == 403)
 
-    seccion('9d. Acopio y produccion (una pasada; proveedor y producto desechables, costo 0)')
+    seccion('9d. Leche (compra de la materia prima LECHE), cuentas con proveedores y produccion')
     hoy_co = (__import__('datetime').datetime.now(__import__('datetime').timezone(__import__('datetime').timedelta(hours=-5)))).strftime('%Y-%m-%d')
     def con_clave(m, ruta, tok, cuerpo=None):
         return llamar(m, ruta, tok, cuerpo, hdr={'Idempotency-Key': 'k-' + secrets.token_hex(10)})
     r = llamar('GET', '/acopio/umbrales', acc_oper)
     chk('umbrales de calidad: 10 C y 18 Dornic', r.status_code == 200 and float(r.json()['temperatura_max']) == 10 and float(r.json()['acidez_max']) == 18, r.text)
+    leche = next((x for x in llamar('GET', '/insumos?size=100', acc_oper).json()['items'] if x['requiere_calidad']), None)
+    chk('existe la materia prima LECHE (litros, con control de calidad)', leche and leche['codigo'] == 'LECHE' and leche['unidad_medida'] == 'LT', str(leche))
+    LECHE = leche['id_insumo']
+    chk('la leche no se desactiva -> 409', llamar('PATCH', f'/insumos/{LECHE}/estado', acc_admin, {'activo': False}).status_code == 409)
+    chk('la leche no cambia de unidad -> 409', llamar('PUT', f'/insumos/{LECHE}', acc_admin, {'nombre': 'Leche cruda', 'unidad_medida': 'KG', 'stock_minimo': 0}).status_code == 409)
     doc = 'T' + secrets.token_hex(5).upper()
-    r = llamar('POST', '/catalogos/proveedores', acc_oper, {'tipo_documento': 'NIT', 'numero_documento': doc, 'nombre': 'PRUEBA ACOPIO ' + doc, 'tipo_proveedor': 'LECHERO'})
-    prov = r.json().get('id_proveedor'); chk('proveedor lechero de prueba creado', r.status_code == 201 and prov, r.text)
-    cuerpo_ok = {'id_proveedor': prov, 'litros': 100.5, 'temperatura': 8, 'acidez': 16}
-    r = con_clave('POST', '/acopio/recepciones', acc_oper, cuerpo_ok)
-    chk('recepcion dentro de umbrales -> 201 APROBADO con la fecha de hoy en Colombia', r.status_code == 201 and r.json()['estado_calidad'] == 'APROBADO' and r.json()['fecha'] == hoy_co and r.json()['proveedor'].startswith('PRUEBA ACOPIO'), r.text)
-    r = con_clave('POST', '/acopio/recepciones', acc_oper, {**cuerpo_ok, 'temperatura': 12})
-    chk('temperatura alta -> 201 RECHAZADO con motivo (un rechazo no es un error)', r.status_code == 201 and r.json()['estado_calidad'] == 'RECHAZADO' and 'Temperatura' in (r.json()['motivo_rechazo'] or ''), r.text)
-    r = llamar('POST', '/acopio/recepciones', acc_oper, cuerpo_ok)
-    chk('sin Idempotency-Key -> 400 (la recepcion crea registros que no se borran)', r.status_code == 400 and 'Idempotency-Key' in r.text, r.text)
-    r = con_clave('POST', '/acopio/recepciones', acc_oper, {**cuerpo_ok, 'fecha': '2099-01-01'})
+    r = llamar('POST', '/catalogos/proveedores', acc_oper, {'tipo_documento': 'NIT', 'numero_documento': doc, 'nombre': 'PRUEBA ACOPIO ' + doc})
+    prov = r.json().get('id_proveedor'); chk('proveedor de prueba creado (sin tipo: surte varias materias primas)', r.status_code == 201 and prov and 'tipo_proveedor' not in r.json(), r.text)
+    cuerpo_ok = {'id_insumo': LECHE, 'id_proveedor': prov, 'cantidad': 100.5, 'temperatura': 8, 'acidez': 16}
+    st0 = float(llamar('GET', f'/insumos/{LECHE}', acc_oper).json()['stock_actual'])
+    r = con_clave('POST', '/insumos/compras', acc_oper, cuerpo_ok)
+    ant = r.json()
+    chk('leche dentro de umbrales (OPERATIVO) -> 201 APROBADO, fecha de hoy en Colombia, a credito', r.status_code == 201 and ant['estado_calidad'] == 'APROBADO' and ant['fecha'] == hoy_co and ant['proveedor'].startswith('PRUEBA ACOPIO') and ant['contado'] is False and ant['requiere_calidad'] is True, r.text)
+    chk('la entrega aprobada suma 100.5 L al stock de leche', abs(float(llamar('GET', f'/insumos/{LECHE}', acc_oper).json()['stock_actual']) - (st0 + 100.5)) < 0.001)
+    r = con_clave('POST', '/insumos/compras', acc_oper, {**cuerpo_ok, 'temperatura': 12})
+    chk('temperatura alta -> 201 RECHAZADO con motivo, vale 0 (un rechazo no es un error)', r.status_code == 201 and r.json()['estado_calidad'] == 'RECHAZADO' and 'Temperatura' in (r.json()['motivo_rechazo'] or '') and float(r.json()['valor_total']) == 0, r.text)
+    chk('la leche rechazada NO entra al stock', abs(float(llamar('GET', f'/insumos/{LECHE}', acc_oper).json()['stock_actual']) - (st0 + 100.5)) < 0.001)
+    r = llamar('POST', '/insumos/compras', acc_oper, cuerpo_ok)
+    chk('sin Idempotency-Key -> 400 (la compra crea registros que no se borran)', r.status_code == 400 and 'Idempotency-Key' in r.text, r.text)
+    r = con_clave('POST', '/insumos/compras', acc_oper, {**cuerpo_ok, 'fecha': '2099-01-01'})
     chk('fecha futura -> 400 con el campo marcado', r.status_code == 400 and 'fecha' in r.json().get('fields', {}), r.text)
-    r = llamar('GET', f'/acopio/recepciones?id_proveedor={prov}', acc_oper)
-    chk('listado filtrado por proveedor: 2 entregas', r.status_code == 200 and r.json()['total'] == 2, r.text)
-    r = llamar('GET', f'/acopio/pago-lecheros?id_proveedor={prov}', acc_oper)
-    it = (r.json().get('items') or [{}])[0]
-    chk('pago a lecheros separa lo aprobado (100.5) de lo rechazado (100.5)', float(it.get('litros_a_pagar', -1)) == 100.5 and float(it.get('litros_rechazados', -1)) == 100.5, r.text)
+    chk('leche sin temperatura ni acidez -> 400', con_clave('POST', '/insumos/compras', acc_oper, {'id_insumo': LECHE, 'id_proveedor': prov, 'cantidad': 10}).status_code == 400)
+    chk('leche sin proveedor -> 400', con_clave('POST', '/insumos/compras', acc_oper, {'id_insumo': LECHE, 'cantidad': 10, 'temperatura': 8, 'acidez': 16}).status_code == 400)
+    r = llamar('GET', f'/insumos/compras?id_proveedor={prov}', acc_oper)
+    chk('listado de compras filtrado por proveedor: 2 entregas', r.status_code == 200 and r.json()['total'] == 2, r.text)
     chk('calidad por proveedor: 50% de rechazo', next((float(x['porcentaje_rechazo']) for x in llamar('GET', '/acopio/calidad?size=100', acc_oper).json()['items'] if x['id_proveedor'] == prov), None) == 50.0)
 
-    # --- precio de la leche, pagos a lecheros y cuentas de la quincena
+    # --- precio pactado (proveedor + materia prima), pagos por quincena y cuentas de la quincena
     per_act = llamar('GET', '/periodos/actual', acc_admin).json()
-    # el precio por defecto es un parametro que el usuario edita: se lee, no se asume
+    # el precio por defecto de la leche es un parametro que el usuario edita: se lee, no se asume
     P = float(next(x for x in llamar('GET', '/parametros', acc_admin).json() if x['clave'] == 'PRECIO_LECHE_DEFAULT')['valor'])
     V_ANT = round(100.5 * P, 2); V_TOT = round(V_ANT + 15000, 2); V_SAL = round(V_TOT - 100000, 2)
-    chk('un OPERATIVO no fija precios -> 403', con_clave('POST', '/acopio/precios', acc_oper, {'id_proveedor': prov, 'precio_litro': 1500}).status_code == 403)
-    r = con_clave('POST', '/acopio/precios', acc_admin, {'id_proveedor': prov, 'precio_litro': 1500})
-    chk('ADMIN fija el precio por litro -> 201 y queda vigente', r.status_code == 201 and float(r.json()['precio_litro']) == 1500 and r.json()['vigente'] is True, r.text)
-    chk('precio invalido (0) -> 400', con_clave('POST', '/acopio/precios', acc_admin, {'id_proveedor': prov, 'precio_litro': 0}).status_code == 400)
-    r = con_clave('POST', '/acopio/recepciones', acc_oper, {'id_proveedor': prov, 'litros': 10, 'temperatura': 8, 'acidez': 16})
-    chk('la recepcion nueva fija precio 1500 y valor 15000', r.status_code == 201 and float(r.json()['precio_litro']) == 1500 and float(r.json()['valor_total']) == 15000, r.text)
-    rech = llamar('GET', f'/acopio/recepciones?id_proveedor={prov}&estado_calidad=RECHAZADO', acc_oper).json()['items'][0]
+    chk('sin precio pactado la leche usa el precio por defecto', abs(float(ant['valor_total']) - V_ANT) < 0.01 and abs(float(ant['costo_unitario']) - P) < 0.001, str(ant))
+    pp = {'id_proveedor': prov, 'id_insumo': LECHE, 'precio_unitario': 1500}
+    chk('un OPERATIVO no fija precios -> 403', con_clave('POST', '/cuentas-proveedores/precios', acc_oper, pp).status_code == 403)
+    r = con_clave('POST', '/cuentas-proveedores/precios', acc_admin, pp)
+    chk('ADMIN fija el precio de la leche con ese proveedor -> 201 y queda vigente', r.status_code == 201 and float(r.json()['precio_unitario']) == 1500 and r.json()['vigente'] is True and r.json()['codigo'] == 'LECHE', r.text)
+    chk('precio invalido (0) -> 400', con_clave('POST', '/cuentas-proveedores/precios', acc_admin, {**pp, 'precio_unitario': 0}).status_code == 400)
+    chk('precio de una materia prima inexistente -> 404', con_clave('POST', '/cuentas-proveedores/precios', acc_admin, {**pp, 'id_insumo': G}).status_code == 404)
+    r = con_clave('POST', '/insumos/compras', acc_oper, {'id_insumo': LECHE, 'id_proveedor': prov, 'cantidad': 10, 'temperatura': 8, 'acidez': 16})
+    chk('la compra nueva toma el precio pactado 1500 y vale 15000', r.status_code == 201 and float(r.json()['costo_unitario']) == 1500 and float(r.json()['valor_total']) == 15000, r.text)
+    r = con_clave('POST', '/insumos/compras', acc_oper, {'id_insumo': LECHE, 'id_proveedor': prov, 'cantidad': 5, 'valor_total': 9000, 'contado': True, 'temperatura': 8, 'acidez': 16})
+    chk('el OPERATIVO NO puede digitar el valor de la leche -> rechazado (409/403) y no se crea la compra', r.status_code in (403, 409, 422) and 'precio pactado' in r.text, r.text)
+    r = con_clave('POST', '/insumos/compras', acc_admin, {'id_insumo': LECHE, 'id_proveedor': prov, 'cantidad': 5, 'valor_total': 9000, 'contado': True, 'temperatura': 8, 'acidez': 16})
+    chk('compra de contado con valor digitado (ADMIN) -> 201 contado, costo 1800 por litro', r.status_code == 201 and r.json()['contado'] is True and float(r.json()['costo_unitario']) == 1800, r.text)
+    rech = llamar('GET', f'/insumos/compras?id_proveedor={prov}&estado_calidad=RECHAZADO', acc_oper).json()['items'][0]
     chk('la leche rechazada vale 0', float(rech['valor_total']) == 0, str(rech))
-    ant = llamar('GET', f'/acopio/recepciones?id_proveedor={prov}&estado_calidad=APROBADO&sort=id_recepcion,asc', acc_oper).json()['items'][0]
-    chk(f'una recepcion anterior conserva su precio (el por defecto del parametro, {P:g})', float(ant['precio_litro']) == P and abs(float(ant['valor_total']) - V_ANT) < 0.01, str(ant))
     pago = {'id_proveedor': prov, 'id_periodo_liquidado': per_act['id_periodo'], 'monto': 100000, 'metodo_pago': 'TRANSFERENCIA', 'referencia_pago': 'PRUEBA'}
-    chk('un OPERATIVO no registra pagos -> 403', con_clave('POST', '/acopio/pagos', acc_oper, pago).status_code == 403)
-    chk('pago sin Idempotency-Key -> 400', llamar('POST', '/acopio/pagos', acc_admin, pago).status_code == 400)
-    r = con_clave('POST', '/acopio/pagos', acc_admin, pago)
+    chk('un OPERATIVO no registra pagos -> 403', con_clave('POST', '/cuentas-proveedores/pagos', acc_oper, pago).status_code == 403)
+    chk('pago sin Idempotency-Key -> 400', llamar('POST', '/cuentas-proveedores/pagos', acc_admin, pago).status_code == 400)
+    r = con_clave('POST', '/cuentas-proveedores/pagos', acc_admin, pago)
     chk('ADMIN paga 100000 -> 201 VIGENTE', r.status_code == 201 and r.json()['estado'] == 'VIGENTE' and float(r.json()['monto']) == 100000, r.text)
     id_pago = r.json().get('id_pago')
-    r = con_clave('POST', '/acopio/pagos', acc_admin, {**pago, 'monto': round(V_SAL + 1000, 2)})
-    chk('pagar mas que el saldo -> rechazado', r.status_code in (400, 409, 422) and r.json().get('code') == 20005, r.text)
-    sp = next((x for x in llamar('GET', '/acopio/saldos?size=100', acc_admin).json()['items'] if x['id_proveedor'] == prov), {})
-    chk('saldo del lechero: comprado - pagado 100000', abs(float(sp.get('total_comprado', 0)) - V_TOT) < 0.01 and float(sp.get('total_pagado', 0)) == 100000 and abs(float(sp.get('saldo', 0)) - V_SAL) < 0.01, str(sp))
-    it = (llamar('GET', f"/acopio/pago-lecheros?id_proveedor={prov}", acc_oper).json().get('items') or [{}])[0]
-    chk('pago-lecheros trae valor, pagado y saldo de la quincena', abs(float(it.get('valor_leche', 0)) - V_TOT) < 0.01 and float(it.get('valor_pagado', 0)) == 100000 and abs(float(it.get('saldo', 0)) - V_SAL) < 0.01, str(it))
+    r = con_clave('POST', '/cuentas-proveedores/pagos', acc_admin, {**pago, 'monto': round(V_SAL + 1000, 2)})
+    chk('pagar mas que el saldo (la compra de contado no cuenta) -> rechazado', r.status_code in (400, 409, 422) and r.json().get('code') == 20005, r.text)
+    sp = next((x for x in llamar('GET', '/cuentas-proveedores/saldos?size=100', acc_admin).json()['items'] if x['id_proveedor'] == prov), {})
+    chk('saldo del proveedor: comprado a credito - pagado 100000', abs(float(sp.get('total_comprado', 0)) - V_TOT) < 0.01 and float(sp.get('total_pagado', 0)) == 100000 and abs(float(sp.get('saldo', 0)) - V_SAL) < 0.01, str(sp))
+    it = (llamar('GET', f"/cuentas-proveedores/resumen?id_proveedor={prov}", acc_oper).json().get('items') or [{}])[0]
+    chk('resumen por quincena trae compras a credito, pagado y saldo', abs(float(it.get('valor_compras', 0)) - V_TOT) < 0.01 and float(it.get('valor_pagado', 0)) == 100000 and abs(float(it.get('saldo', 0)) - V_SAL) < 0.01 and it.get('numero_compras') == 2, str(it))
     cu = llamar('GET', f"/periodos/{per_act['id_periodo']}", acc_oper).json()
-    chk('la quincena muestra leche comprada, pagada y por pagar', all(k in cu for k in ('leche_comprada', 'leche_pagada', 'leche_por_pagar', 'caja_neta', 'total_cobrado', 'total_vendido')) and float(cu['leche_comprada']) >= V_TOT and float(cu['leche_pagada']) >= 100000, str(cu))
-    chk('la quincena: por pagar = comprada - pagada', abs(float(cu['leche_por_pagar']) - (float(cu['leche_comprada']) - float(cu['leche_pagada']))) < 0.01)
-    chk('un OPERATIVO no anula pagos -> 403', con_clave('POST', f'/acopio/pagos/{id_pago}/anular', acc_oper, {'motivo': 'Intento de un operativo'}).status_code == 403)
-    r = con_clave('POST', f'/acopio/pagos/{id_pago}/anular', acc_admin, {'motivo': 'Pago de prueba anulado'})
+    claves_q = ('leche_comprada', 'compras_materias_primas', 'compras_contado', 'compras_credito', 'pagado_proveedores', 'por_pagar_proveedores', 'caja_neta', 'total_cobrado', 'total_vendido')
+    chk('la quincena muestra compras (contado y credito), pagado y por pagar a proveedores', all(k in cu for k in claves_q) and float(cu['compras_credito']) >= V_TOT and float(cu['compras_contado']) >= 9000 and float(cu['pagado_proveedores']) >= 100000, str(cu))
+    chk('la quincena: por pagar = compras a credito - pagado', abs(float(cu['por_pagar_proveedores']) - (float(cu['compras_credito']) - float(cu['pagado_proveedores']))) < 0.01)
+    chk('anular una compra a credito con la quincena ya pagada de mas -> 409 (anule primero el pago)',
+        con_clave('POST', f"/insumos/compras/{ant['id_compra']}/anular", acc_admin, {'motivo': 'Compra de prueba anulada'}).status_code == 409)
+    chk('un OPERATIVO no anula pagos -> 403', con_clave('POST', f'/cuentas-proveedores/pagos/{id_pago}/anular', acc_oper, {'motivo': 'Intento de un operativo'}).status_code == 403)
+    r = con_clave('POST', f'/cuentas-proveedores/pagos/{id_pago}/anular', acc_admin, {'motivo': 'Pago de prueba anulado'})
     chk('ADMIN anula el pago -> ANULADO', r.status_code == 200 and r.json()['estado'] == 'ANULADO', r.text)
-    r = con_clave('POST', f'/acopio/pagos/{id_pago}/anular', acc_admin, {'motivo': 'Segunda anulacion'})
+    r = con_clave('POST', f'/cuentas-proveedores/pagos/{id_pago}/anular', acc_admin, {'motivo': 'Segunda anulacion'})
     chk('anular dos veces -> 409', r.status_code == 409, r.text)
-    sp = next((x for x in llamar('GET', '/acopio/saldos?size=100', acc_admin).json()['items'] if x['id_proveedor'] == prov), {})
-    chk('al anular, el saldo vuelve al total comprado', abs(float(sp.get('saldo', 0)) - V_TOT) < 0.01, str(sp))
-    chk('el historial de precios lista el nuevo', llamar('GET', f'/acopio/precios?id_proveedor={prov}', acc_oper).json()['total'] == 1)
+    sp = next((x for x in llamar('GET', '/cuentas-proveedores/saldos?size=100', acc_admin).json()['items'] if x['id_proveedor'] == prov), {})
+    chk('al anular, el saldo vuelve al total comprado a credito', abs(float(sp.get('saldo', 0)) - V_TOT) < 0.01, str(sp))
+    chk('el historial de precios lista el nuevo', llamar('GET', f'/cuentas-proveedores/precios?id_proveedor={prov}&id_insumo={LECHE}', acc_oper).json()['total'] == 1)
 
     sku = 'TP' + secrets.token_hex(4).upper()
     r = llamar('POST', '/catalogos/productos', acc_admin, {'codigo_sku': sku, 'nombre': 'PRUEBA PRODUCCION ' + sku, 'unidad_medida': 'UND', 'precio_base': 1000, 'tarifa_iva': 0})
     prod = r.json().get('id_producto'); chk('producto de prueba creado (stock 0)', r.status_code == 201 and prod, r.text)
-    lote_body = {'id_producto': prod, 'litros_leche_usados': 50, 'cantidad_obtenida': 40, 'costo_por_litro': 0}
+    lote_body = {'id_producto': prod, 'litros_leche_usados': 50, 'cantidad_obtenida': 40}
     r = con_clave('POST', '/produccion/lotes', acc_oper, lote_body)
     lote = r.json()
     chk('lote -> 201 con codigo SKU-AAAAMMDD-001, rendimiento 80 % y vence en 21 dias',
         r.status_code == 201 and lote['codigo_lote'] == f"{sku}-{hoy_co.replace('-', '')}-001" and float(lote['porcentaje_rendimiento']) == 80.0 and lote['dias_restantes'] == 21, r.text)
+    chk('el costo de la leche del lote sale del promedio del stock (sin costo digitado): costo_leche = 50 L x costo_por_litro, sin receta no hay litros esperados',
+        float(lote['costo_leche']) > 0 and abs(float(lote['costo_leche']) - 50 * float(lote['costo_por_litro'])) < 0.6 and lote['litros_esperados'] is None, str(lote))
+    r = llamar('GET', f"/insumos/consumos?id_lote={lote['id_lote']}", acc_oper)
+    chk('el lote descuenta la leche del stock: un consumo de LECHE por 50 L con el costo congelado', r.status_code == 200 and any(x['codigo'] == 'LECHE' and float(x['cantidad']) == 50 for x in r.json()), r.text)
+    r = con_clave('POST', '/produccion/lotes', acc_oper, {**lote_body, 'litros_leche_usados': 9999999})
+    chk('un lote que usa mas leche de la que hay -> 409 (20002)', r.status_code == 409 and r.json()['code'] == 20002 and 'leche' in r.json()['message'].lower(), r.text)
     r = llamar('GET', f'/inventario?texto={sku}', acc_oper)
     chk('el stock subio a 40', r.status_code == 200 and float(r.json()['items'][0]['stock_actual']) == 40, r.text)
     r = con_clave('POST', '/produccion/lotes', acc_oper, {**lote_body, 'fecha_vencimiento': '2000-01-01'})
@@ -836,6 +879,14 @@ try:
     chk('un OPERATIVO no castiga cartera -> 403', llamar('POST', '/cartera/castigos', acc_oper, {'id_cliente': cli, 'motivo': 'Intento de un operativo'}).status_code == 403)
     r = con_clave('POST', '/cartera/castigos', acc_admin, {'id_cliente': cli, 'motivo': 'Cliente sin deuda: debe rechazarse'})
     chk('castigar a quien no debe nada -> 409', r.status_code == 409, r.text)
+    # castigo real: la plata perdida cuenta en la quincena de HOY (la de la venta, si ya estuviera cerrada, no se toca)
+    cast0 = float(llamar('GET', '/periodos/actual', acc_oper).json().get('cartera_castigada') or 0)
+    r = con_clave('POST', '/ventas', acc_oper, {'id_cliente': cli, 'tipo_venta': 'CREDITO', 'lineas': [{'id_producto': prod2, 'cantidad': 1}]})
+    r = con_clave('POST', '/cartera/castigos', acc_admin, {'id_cliente': cli, 'motivo': 'Cliente que no paga: prueba de castigo'})
+    chk('ADMIN castiga la deuda de 14,28 -> 201/200 con el monto castigado', r.status_code in (200, 201) and float(r.json()['monto_castigado']) == 14.28, r.text)
+    cast1 = float(llamar('GET', '/periodos/actual', acc_oper).json().get('cartera_castigada') or 0)
+    chk('el castigo se suma a la quincena actual (+14,28)', abs((cast1 - cast0) - 14.28) < 0.01, f'{cast0} -> {cast1}')
+    chk('el cliente queda sin deuda', all(float(c['saldo_deudor']) == 0 for c in llamar('GET', '/cartera/clientes?texto=PRUEBA VENTAS', acc_oper).json()['items'] if c['id_cliente'] == cli))
     # limpieza: lo desechable se desactiva (las ventas quedan: son de solo insercion)
     llamar('PATCH', f"/precios-cliente/{pc['id_precio']}/estado", acc_admin, {'activo': False})
     llamar('PATCH', f'/catalogos/productos/{prod2}/estado', acc_admin, {'activo': False})
@@ -865,8 +916,10 @@ try:
     chk('un OPERATIVO no registra compras -> 403', compra(acc_oper, c1).status_code == 403)
     chk('compra sin Idempotency-Key -> 400', compra(acc_admin, c1, clave=False).status_code == 400)
     chk('compra con fecha futura -> 400 con el campo marcado', 'fecha' in (compra(acc_admin, {**c1, 'fecha': '2099-01-01'}).json().get('fields') or {}))
-    r = compra(acc_admin, {**c1, 'id_proveedor': prov})
-    chk('proveedor LECHERO en una compra de insumos -> 409 (debe ser de tipo INSUMOS)', r.status_code == 409 and r.json()['code'] == 20006, r.text)
+    chk('temperatura en una materia prima sin control de calidad -> 400', compra(acc_admin, {**c1, 'temperatura': 8, 'acidez': 16}).status_code == 400)
+    chk('compra a credito sin proveedor -> 400', compra(acc_admin, {**c1, 'contado': False}).status_code == 400)
+    r = compra(acc_admin, {**c1, 'id_proveedor': G})
+    chk('proveedor inexistente -> 404', r.status_code == 404, r.text)
     r = compra(acc_admin, c1)
     id_c1 = r.json().get('id_compra')
     chk('compra 1: 10 kg por 40000 -> 201, costo unitario 4000', r.status_code == 201 and num(r.json()['costo_unitario']) == 4000 and r.json()['estado'] == 'VIGENTE', r.text)
@@ -896,13 +949,19 @@ try:
     chk('cantidad 0 en la receta -> 400', llamar('PUT', f'/catalogos/productos/{pr2}/receta', acc_admin, {'lineas': [{'id_insumo': az, 'cantidad': 0}]}).status_code == 400)
     chk('la receta no cambio tras los intentos fallidos', len(llamar('GET', f'/catalogos/productos/{pr2}/receta', acc_oper).json()['lineas']) == 2)
 
-    # --- el lote descuenta insumos y suma su costo
-    lb = {'id_producto': pr2, 'litros_leche_usados': 5, 'cantidad_obtenida': 10, 'costo_por_litro': 0}
+    # --- la receta lleva la leche (litros por unidad): sirve de referencia para los litros del lote
+    r = llamar('PUT', f'/catalogos/productos/{pr2}/receta', acc_admin, {'lineas': [{'id_insumo': az, 'cantidad': 0.5}, {'id_insumo': en, 'cantidad': 1}, {'id_insumo': LECHE, 'cantidad': 0.5}]})
+    chk('la receta admite la leche: 3 lineas, una en litros', r.status_code == 200 and len(r.json()['lineas']) == 3 and any(l['unidad_insumo'] == 'LT' for l in r.json()['lineas']), r.text)
+    # --- el lote descuenta materias primas (la leche incluida) y suma su costo
+    lb = {'id_producto': pr2, 'litros_leche_usados': 5, 'cantidad_obtenida': 10}
     r = con_clave('POST', '/produccion/lotes', acc_oper, lb)
     lote2 = r.json()
-    chk('lote de 10 und: costo de insumos 27000 (5 kg x 5000 + 10 envases x 200), leche 0', r.status_code == 201 and num(lote2['costo_insumos']) == 27000 and num(lote2['costo_leche']) == 0 and num(lote2['costo_total']) == 27000 and num(lote2['costo_unitario']) == 2700, r.text)
+    chk('lote de 10 und: costo de insumos 27000 (5 kg x 5000 + 10 envases x 200) + leche valorada al promedio del stock',
+        r.status_code == 201 and num(lote2['costo_insumos']) == 27000 and num(lote2['costo_leche']) > 0 and abs(num(lote2['costo_leche']) - 5 * num(lote2['costo_por_litro'])) < 0.06
+        and abs(num(lote2['costo_total']) - (27000 + num(lote2['costo_leche']))) < 0.01, r.text)
+    chk('la receta esperaba 5 L (0.5 x 10) y se usaron 5: diferencia 0', num(lote2['litros_esperados']) == 5 and num(lote2['diferencia_litros']) == 0, str(lote2))
     r = llamar('GET', f"/insumos/consumos?id_lote={lote2['id_lote']}", acc_oper)
-    chk('el lote registra sus 2 consumos con el costo congelado', r.status_code == 200 and len(r.json()) == 2 and sorted(num(x['valor']) for x in r.json()) == [2000, 25000], r.text)
+    chk('el lote registra sus 3 consumos (leche incluida) con el costo congelado', r.status_code == 200 and len(r.json()) == 3 and sorted(num(x['valor']) for x in r.json() if x['codigo'] != 'LECHE') == [2000, 25000], r.text)
     chk('stock descontado: azucar 15, envases 90', num(llamar('GET', f'/insumos/{az}', acc_oper).json()['stock_actual']) == 15 and num(llamar('GET', f'/insumos/{en}', acc_oper).json()['stock_actual']) == 90)
     # --- stock minimo de productos y notificaciones
     chk('notificaciones: con stock 15 y minimo 2 el azucar ya no alerta', not any(n['clave'] == f'INSUMO:{az}' for n in llamar('GET', '/notificaciones', acc_oper).json()['items']))
@@ -918,7 +977,7 @@ try:
     c3 = compra(acc_admin, {'id_insumo': az, 'cantidad': 5, 'valor_total': 50000}).json()
     id_c3 = c3.get('id_compra')
     chk('compra 3: el promedio sube a 6250', num(llamar('GET', f'/insumos/{az}', acc_oper).json()['costo_promedio']) == 6250)
-    chk('el costo del lote ya producido no cambia (27000)', num(llamar('GET', f"/produccion/lotes?id_producto={pr2}", acc_oper).json()['items'][0]['costo_total']) == 27000)
+    chk('el costo del lote ya producido no cambia', num(llamar('GET', f"/produccion/lotes?id_producto={pr2}", acc_oper).json()['items'][0]['costo_total']) == num(lote2['costo_total']))
     # sin stock suficiente: no se crea nada
     r = con_clave('POST', '/produccion/lotes', acc_oper, {**lb, 'cantidad_obtenida': 1000})
     chk('lote que necesita mas insumo del que hay -> 409 (20002) con el nombre del insumo', r.status_code == 409 and r.json()['code'] == 20002 and 'PRUEBA' in r.json()['message'], r.text)
@@ -938,17 +997,22 @@ try:
 
     # --- anulacion de compras (stock actual del azucar: 20)
     chk('un OPERATIVO no anula compras -> 403', con_clave('POST', f'/insumos/compras/{id_c2}/anular', acc_oper, {'motivo': 'Intento de un operativo'}).status_code == 403)
+    # una compra de la que ya se uso o ajusto el material NO se anula (el promedio quedaria mal): se corrige con un ajuste
     r = con_clave('POST', f'/insumos/compras/{id_c2}/anular', acc_admin, {'motivo': 'Compra de prueba anulada'})
+    chk('anular una compra cuando despues ya se uso o se ajusto la materia prima -> 409 (20006) y nada cambia',
+        r.status_code == 409 and r.json()['code'] == 20006 and 'ajuste' in r.text and num(llamar('GET', f'/insumos/{az}', acc_oper).json()['stock_actual']) == 20, r.text)
+    # una compra sin movimientos posteriores si se anula, y el stock y el promedio vuelven a lo de antes
+    ant_az = llamar('GET', f'/insumos/{az}', acc_oper).json()
+    r = compra(acc_admin, {'id_insumo': az, 'cantidad': 5, 'valor_total': 10000}); id_c4 = r.json().get('id_compra')
+    r = con_clave('POST', f'/insumos/compras/{id_c4}/anular', acc_admin, {'motivo': 'Compra de prueba anulada'})
     a = llamar('GET', f'/insumos/{az}', acc_oper).json()
-    chk('ADMIN anula la compra 2 -> ANULADA, stock 10 y promedio 6500', r.status_code == 200 and r.json()['estado'] == 'ANULADA' and num(a['stock_actual']) == 10 and num(a['costo_promedio']) == 6500, r.text + str(a))
-    chk('anular dos veces -> 409', con_clave('POST', f'/insumos/compras/{id_c2}/anular', acc_admin, {'motivo': 'Segunda anulacion'}).status_code == 409)
-    r = con_clave('POST', '/produccion/lotes', acc_oper, {**lb, 'cantidad_obtenida': 30})
-    chk('con el stock ya menor, un lote de 30 und (15 kg) -> 409', r.status_code == 409 and r.json()['code'] == 20002, r.text)
-    chk('anular una compra cuando ya no alcanza el stock para devolverla -> 409',
-        con_clave('POST', f'/insumos/compras/{id_c3}/anular', acc_admin, {'motivo': 'Compra 3 anulada de prueba'}).status_code == 200
-        and con_clave('POST', f'/insumos/compras/{id_c1}/anular', acc_admin, {'motivo': 'Compra 1 sin stock suficiente'}).status_code == 409)
-    chk('listado de compras del insumo: 3, con una VIGENTE', llamar('GET', f'/insumos/compras?id_insumo={az}', acc_oper).json()['total'] == 3
-        and llamar('GET', f'/insumos/compras?id_insumo={az}&estado=VIGENTE', acc_oper).json()['total'] == 1)
+    chk('ADMIN anula una compra sin movimientos posteriores -> ANULADA y stock y promedio como antes',
+        r.status_code == 200 and r.json()['estado'] == 'ANULADA' and num(a['stock_actual']) == num(ant_az['stock_actual']) and abs(num(a['costo_promedio']) - num(ant_az['costo_promedio'])) < 0.01, r.text + str(a))
+    chk('anular dos veces -> 409', con_clave('POST', f'/insumos/compras/{id_c4}/anular', acc_admin, {'motivo': 'Segunda anulacion'}).status_code == 409)
+    r = con_clave('POST', '/produccion/lotes', acc_oper, {**lb, 'cantidad_obtenida': 50})
+    chk('con el stock que queda, un lote de 50 und (25 kg) -> 409', r.status_code == 409 and r.json()['code'] == 20002, r.text)
+    chk('listado de compras del insumo: 4, con 3 VIGENTES', llamar('GET', f'/insumos/compras?id_insumo={az}', acc_oper).json()['total'] == 4
+        and llamar('GET', f'/insumos/compras?id_insumo={az}&estado=VIGENTE', acc_oper).json()['total'] == 3)
 
     # --- reglas de edicion y estado
     r = llamar('PUT', f'/insumos/{az}', acc_admin, {'nombre': 'PRUEBA AZUCAR', 'unidad_medida': 'GR', 'stock_minimo': 2})
@@ -959,7 +1023,7 @@ try:
     r = llamar('PATCH', f'/insumos/{az}/estado', acc_admin, {'activo': False})
     chk('desactivar un insumo que esta en la receta de un producto activo -> 409', r.status_code == 409 and r.json()['code'] == 20006, r.text)
     cu = llamar('GET', '/periodos/actual', acc_oper).json()
-    chk('la quincena trae compras_insumos', 'compras_insumos' in cu and num(cu['compras_insumos']) >= 0, str(cu))
+    chk('la quincena trae compras_materias_primas', 'compras_materias_primas' in cu and num(cu['compras_materias_primas']) >= 0, str(cu))
     r = llamar('GET', '/insumos/resumen', acc_oper)
     chk('resumen de insumos', r.status_code == 200 and {'total_insumos', 'bajo_minimo', 'valor_total'} <= set(r.json()), r.text)
 
@@ -1001,20 +1065,21 @@ try:
     llamar('DELETE', f'/finanzas/categorias/{cat}', acc_admin)
     chk('categoria inactiva -> 409', con_clave('POST', '/finanzas/gastos', acc_oper, g1).status_code == 409)
 
-    rid = ant['id_recepcion']
-    d1 = {'tipo_entidad': 'RECEPCION_LECHE', 'id_entidad': rid, 'nombre_archivo': 'prueba-' + tag + '.pdf'}
+    rid = ant['id_compra']
+    d1 = {'tipo_entidad': 'COMPRA', 'id_entidad': rid, 'nombre_archivo': 'prueba-' + tag + '.pdf'}
     chk('documento de una entidad inexistente -> 404', con_clave('POST', '/documentos', acc_oper, {**d1, 'id_entidad': G}).status_code == 404)
     chk('documento con tipo invalido -> 400', con_clave('POST', '/documentos', acc_oper, {**d1, 'tipo_entidad': 'OTRO'}).status_code == 400)
     r = con_clave('POST', '/documentos', acc_oper, d1)
     did = r.json().get('id_documento')
     chk('se encola el documento -> 201 PENDIENTE, application/pdf', r.status_code == 201 and did and r.json()['estado_carga'] == 'PENDIENTE' and r.json()['mime_type'] == 'application/pdf', r.text)
-    r = con_clave('POST', f'/documentos/{did}/error', acc_oper, {'mensaje': 'Sin red'})
+    r = con_clave('POST', f'/documentos/{did}/error', acc_admin, {'mensaje': 'Sin red'})
+    chk('un OPERATIVO no marca documentos como subidos ni con error -> 403', con_clave('POST', f'/documentos/{did}/error', acc_oper, {'mensaje': 'x'}).status_code == 403 and con_clave('POST', f'/documentos/{did}/subido', acc_oper, {'drive_file_id': 'x'}).status_code == 403)
     chk('marcar error -> ERROR con 1 intento', r.status_code == 200 and r.json()['estado_carga'] == 'ERROR' and r.json()['intentos'] == 1, r.text)
-    chk('checksum invalido -> 400', con_clave('POST', f'/documentos/{did}/subido', acc_oper, {'drive_file_id': 'abc', 'checksum_sha256': 'xyz'}).status_code == 400)
-    r = con_clave('POST', f'/documentos/{did}/subido', acc_oper, {'drive_file_id': 'drv-' + tag, 'drive_url': 'https://drive.example/' + tag, 'checksum_sha256': 'a' * 64})
+    chk('checksum invalido -> 400', con_clave('POST', f'/documentos/{did}/subido', acc_admin, {'drive_file_id': 'abc', 'checksum_sha256': 'xyz'}).status_code == 400)
+    r = con_clave('POST', f'/documentos/{did}/subido', acc_admin, {'drive_file_id': 'drv-' + tag, 'drive_url': 'https://drive.example/' + tag, 'checksum_sha256': 'a' * 64})
     chk('marcar subido -> SUBIDO con fecha_carga', r.status_code == 200 and r.json()['estado_carga'] == 'SUBIDO' and r.json()['fecha_carga'], r.text)
-    chk('un documento ya SUBIDO no vuelve a marcarse -> 409', con_clave('POST', f'/documentos/{did}/error', acc_oper, {'mensaje': 'x'}).status_code == 409)
-    r = llamar('GET', f'/documentos?tipo_entidad=RECEPCION_LECHE&id_entidad={rid}&estado_carga=SUBIDO', acc_oper).json()
+    chk('un documento ya SUBIDO no vuelve a marcarse -> 409', con_clave('POST', f'/documentos/{did}/error', acc_admin, {'mensaje': 'x'}).status_code == 409)
+    r = llamar('GET', f'/documentos?tipo_entidad=COMPRA&id_entidad={rid}&estado_carga=SUBIDO', acc_oper).json()
     chk('el listado filtra por entidad y estado', r['total'] >= 1 and any(i['id_documento'] == did for i in r['items']), str(r)[:200])
 
     seccion('9h. Comprobantes (solo lectura, con los datos que dejaron las secciones anteriores)')
@@ -1026,7 +1091,7 @@ try:
         (x['sentido'] == 'INGRESO') == (x['tipo'] in ('VENTA', 'ABONO')) for x in lst))
     # un ejemplo de CADA tipo, pedido por filtro (no depende de que salgan entre los ultimos 100)
     ejemplos = {}
-    for tp in ('VENTA', 'ABONO', 'PAGO_LECHERO', 'COMPRA_INSUMO', 'GASTO'):
+    for tp in ('VENTA', 'ABONO', 'PAGO_PROVEEDOR', 'COMPRA', 'GASTO'):
         rr = llamar('GET', f'/comprobantes?tipo={tp}&size=1', acc_oper)
         ejemplos[tp] = (rr.json().get('items') or [None])[0] if rr.status_code == 200 else None
         chk(f'hay al menos un comprobante {tp}', ejemplos[tp] is not None, rr.text[:200])
@@ -1042,7 +1107,7 @@ try:
     chk('sort invalido -> 400', llamar('GET', '/comprobantes?sort=clave,asc', acc_oper).status_code == 400)
     r = llamar('GET', '/comprobantes/resumen', acc_oper)
     chk('resumen: neto = ingresos - egresos', r.status_code == 200 and abs(num(r.json()['neto']) - (num(r.json()['ingresos']) - num(r.json()['egresos']))) < 0.01, r.text)
-    for tp in ('VENTA', 'ABONO', 'PAGO_LECHERO', 'COMPRA_INSUMO', 'GASTO'):
+    for tp in ('VENTA', 'ABONO', 'PAGO_PROVEEDOR', 'COMPRA', 'GASTO'):
         ej = ejemplos.get(tp)
         if not ej: continue
         r = llamar('GET', f"/comprobantes/{tp}/{ej['id_documento']}", acc_oper)
@@ -1053,11 +1118,31 @@ try:
     chk('detalle inexistente -> 404', llamar('GET', f'/comprobantes/VENTA/{G}', acc_oper).status_code == 404)
     chk('detalle con tipo invalido -> 400', llamar('GET', '/comprobantes/XX/1', acc_oper).status_code == 400)
 
+    seccion('9h2. Cartera por edades y margen (solo lectura, con los datos de las secciones anteriores)')
+    ed = llamar('GET', '/cartera/edades', acc_oper).json()
+    chk('edades: 5 rangos en orden y su suma es el total', [x['clave'] for x in ed['rangos']] == ['AL_DIA', 'MORA_1_15', 'MORA_16_30', 'MORA_31_60', 'MORA_MAS_60']
+        and abs(sum(float(x['saldo']) for x in ed['rangos']) - float(ed['total'])) < 0.01 and ed['fecha_corte'] == hoy_co, str(ed))
+    chk('edades: el total coincide con la cartera total del resumen', abs(float(ed['total']) - float(llamar('GET', '/cartera/resumen', acc_oper).json()['total_cartera'])) < 0.01)
+    ec = llamar('GET', '/cartera/edades/clientes?size=100&sort=saldo_total,desc', acc_oper).json()
+    chk('edades por cliente: paginado, y cada cliente suma sus rangos', all(abs(float(c['al_dia']) + float(c['mora_leve']) + float(c['mora_media']) + float(c['mora_alta']) + float(c['mora_critica']) - float(c['saldo_total'])) < 0.01 for c in ec['items']) and 'total' in ec, str(ec)[:300])
+    chk('edades: un OPERATIVO si las ve (como la cartera)', llamar('GET', '/cartera/edades', acc_oper).status_code == 200)
+    mp = llamar('GET', '/reportes/margen?agrupar=PRODUCTO&desde=2020-01-01&hasta=' + hoy_co, acc_admin)
+    mj = mp.json() if mp.status_code == 200 else {}
+    chk('margen por producto: ADMIN, totales y filas', mp.status_code == 200 and mj['agrupar'] == 'PRODUCTO' and {'ingreso', 'costo', 'margen', 'margen_pct', 'lineas_sin_costo'} <= set(mj['totales']), mp.text[:300])
+    chk('margen: la suma de las filas es el total (margen e ingreso)', len(mj.get('items', [])) < 500 and abs(sum(float(x['margen']) for x in mj['items']) - float(mj['totales']['margen'])) < 0.05
+        and abs(sum(float(x['ingreso']) for x in mj['items']) - float(mj['totales']['ingreso'])) < 0.05, str(mj['totales']))
+    mc = llamar('GET', '/reportes/margen?agrupar=CLIENTE&desde=2020-01-01&hasta=' + hoy_co + '&sort=ingreso,desc', acc_admin)
+    chk('margen por cliente -> 200', mc.status_code == 200 and mc.json()['agrupar'] == 'CLIENTE', mc.text[:200])
+    chk('un OPERATIVO no ve el margen -> 403', llamar('GET', '/reportes/margen', acc_oper).status_code == 403)
+    chk('agrupar invalido -> 400', llamar('GET', '/reportes/margen?agrupar=OTRO', acc_admin).status_code == 400)
+    chk('rango de fechas al reves -> 400', llamar('GET', '/reportes/margen?desde=2026-02-01&hasta=2026-01-01', acc_admin).status_code == 400)
+    chk('sort invalido -> 400', llamar('GET', '/reportes/margen?sort=costo', acc_admin).status_code == 400)
+
     seccion('9i. Tablero (solo lectura, el OPERATIVO ve lo mismo que el ADMIN)')
     r = llamar('GET', '/tablero', acc_oper)
     t = r.json() if r.status_code == 200 else {}
     chk('tablero -> 200 con todos los bloques', r.status_code == 200 and all(
-        k in t for k in ('fecha', 'hoy', 'quincena', 'cartera', 'inventario', 'lecheros', 'alertas', 'ventas_semana')), r.text[:300])
+        k in t for k in ('fecha', 'hoy', 'quincena', 'cartera', 'inventario', 'proveedores', 'alertas', 'ventas_semana')), r.text[:300])
     if t:
         h, serie = t['hoy'], t['ventas_semana']
         chk('caja neta de hoy = ingresos - egresos', abs(num(h['caja_neta']) - (num(h['caja_ingresos']) - num(h['caja_egresos']))) < 0.01, str(h))
@@ -1076,7 +1161,7 @@ try:
 
     seccion('10. Bloqueo por intentos y limite de frecuencia')
     u_blq = f't.blq.{SUF}'
-    r = llamar('POST', '/usuarios', acc_admin, {'usuario': u_blq, 'nombre': 'Prueba Bloqueo', 'email': f'{u_blq}@example.com', 'rol': 'OPERATIVO'})
+    r = llamar('POST', '/usuarios', acc_admin, {'usuario': u_blq, 'nombre': 'Prueba Bloqueo', 'email': f'{u_blq}@example.com', 'rol': 'OPERATIVO', 'codigo': cod()})
     id_blq, pw_blq = r.json()['usuario']['id_usuario'], r.json()['clave_temporal']
     for i in range(4):
         r = auth('/login', {'usuario': u_blq, 'clave': f'mal{i}'})
@@ -1112,7 +1197,7 @@ try:
     chk('una ruta protegida con ese mismo token sigue dando 401', llamar('GET', '/catalogos/clientes', malo).status_code == 401)
 
     u_m = f't.mfa.{SUF}'
-    r = llamar('POST', '/usuarios', acc_admin, {'usuario': u_m, 'nombre': 'Prueba MFA', 'email': f'{u_m}@example.com', 'rol': 'OPERATIVO'})
+    r = llamar('POST', '/usuarios', acc_admin, {'usuario': u_m, 'nombre': 'Prueba MFA', 'email': f'{u_m}@example.com', 'rol': 'OPERATIVO', 'codigo': cod()})
     id_m, pw_m = r.json()['usuario']['id_usuario'], r.json()['clave_temporal']
     n_m = 'Clave-Mfa-' + secrets.token_hex(5) + '!'
     acc_m = entrar_operativo(u_m, pw_m, n_m)
@@ -1128,7 +1213,7 @@ try:
     chk('usuario de prueba con MFA activo y codigos de respaldo', j.get('estado') == 'MFA_ACTIVADO' and len(resp_m) == 10, j)
     t_totp = auth('/login', {'usuario': u_m, 'clave': n_m}).json()['token_temporal']
     t_resp = auth('/login', {'usuario': u_m, 'clave': n_m}).json()['token_temporal']
-    r = llamar('POST', f'/usuarios/{id_m}/restablecer-clave', acc_admin)
+    r = llamar('POST', f'/usuarios/{id_m}/restablecer-clave', acc_admin, {'codigo': cod()})
     chk('ADMIN restablece la clave de esa persona', r.status_code == 200 and r.json().get('clave_temporal'), r.text)
     paso_m = int(time.time()) // 30 + 1
     j = auth('/mfa/verificar', {'codigo': totp(sec_m, paso_m)}, t_totp).json()
