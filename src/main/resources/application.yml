@@ -79,6 +79,15 @@ sila:
     # La cookie de renovacion solo viaja por HTTPS. Chrome y Firefox la aceptan en http://localhost.
     cookie-secure: ${SILA_COOKIE_SECURE:true}
     mfa-obligatorio-roles: ADMIN
+  asistente:
+    # Chat de ayuda (flujos de n8n en esta misma maquina). Sin url = apagado. n8n no se expone a internet.
+    url: ${SILA_ASISTENTE_URL:}
+    secreto: ${SILA_ASISTENTE_SECRETO:}
+    # Direccion del API vista DESDE n8n (si n8n corre en Docker, la del anfitrion).
+    base-url: ${SILA_ASISTENTE_BASE_URL:http://127.0.0.1:8080/api/v1}
+    token-ttl: 5m
+    timeout: 60s
+    limite-por-hora: 30
   cors:
     # Origenes permitidos (separados por coma). ng serve usa :4200.
     origenes: http://localhost:4200

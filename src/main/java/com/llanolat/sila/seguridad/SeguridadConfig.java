@@ -22,11 +22,13 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Cadena de seguridad HTTP. Sin sesion de servidor, sin CSRF de formulario (la API usa
@@ -46,8 +48,10 @@ public class SeguridadConfig {
     @Bean
     @ConditionalOnProperty(name = "sila.seguridad.modo", havingValue = "jwt")
     SecurityFilterChain cadenaJwt(HttpSecurity http, IdempotenciaRepository idempotencia,
-                                  IdempotenciaProps idempotenciaProps) throws Exception {
+                                  IdempotenciaProps idempotenciaProps, JsonMapper json) throws Exception {
         comun(http);
+        // El token de solo lectura del asistente: solo GET sobre rutas de negocio, sin datos personales en la respuesta.
+        http.addFilterAfter(new AlcanceLecturaFilter(json), BearerTokenAuthenticationFilter.class);
         http.addFilterAfter(new IdempotenciaFilter(idempotencia, idempotenciaProps), AuthorizationFilter.class);
         http.authorizeHttpRequests(a -> a
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()

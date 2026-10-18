@@ -59,6 +59,29 @@ public class TokenService {
                       .getTokenValue();
     }
 
+    /**
+     * Token de ACCESO de solo lectura para el asistente (n8n): mismo usuario, rol y sesion, vida corta y el claim
+     * ambito=lectura, que AlcanceLecturaFilter usa para rechazar todo lo que no sea una consulta GET permitida.
+     */
+    public String emitirLectura(long idUsuario, String usuario, String rol, String sid, Duration ttl) {
+        Instant ahora = Instant.now();
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
+                .issuer(props.emisor())
+                .subject(usuario)
+                .issuedAt(ahora)
+                .expiresAt(ahora.plus(ttl))
+                .id(UUID.randomUUID().toString())
+                .claim("uid", idUsuario)
+                .claim("rol", rol)
+                .claim("tipo", Tipo.ACCESO.claim())
+                .claim("ambito", AlcanceLecturaFilter.AMBITO);
+        if (sid != null) {
+            claims = claims.claim("sid", sid);
+        }
+        return encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims.build()))
+                      .getTokenValue();
+    }
+
     public long segundosAcceso() {
         return props.accesoTtl().toSeconds();
     }

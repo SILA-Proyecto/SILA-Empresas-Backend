@@ -182,3 +182,10 @@ Los PDF de comprobantes NO tienen endpoint de escritura: `ComprobanteArchivos` l
 | GET | `/api/v1/reportes/margen` | ADMIN | margen por `agrupar=PRODUCTO\|CLIENTE` entre `desde` y `hasta` (por defecto el mes en curso); costo = promedio de los lotes del producto (aproximado) |
 
 Detalle de campos en `~/Documentos/dashboard/dashboard-app/docs/PROMPT_REPORTES.md`.
+
+## Asistente (chat de ayuda con n8n)
+| Método | Ruta | Rol | Qué |
+|---|---|---|---|
+| POST | `/api/v1/asistente/mensajes` | todos | `{mensaje (1-1000), sesion_id (8-64: letras, números, guion)}` → `{respuesta, sesion_id}`. Pasa la pregunta a n8n (`SILA_ASISTENTE_URL`); 503 si está apagado o n8n no responde; 429 tras 30 preguntas por hora; lleva `Idempotency-Key` |
+
+n8n recibe un token de **solo lectura** (mismo usuario y rol, 5 min): solo `GET` sobre rutas de negocio y sin datos personales de contacto en las respuestas. Detalle, variables y catálogo de herramientas: `ASISTENTE_N8N.md`.

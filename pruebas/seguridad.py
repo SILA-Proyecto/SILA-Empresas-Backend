@@ -1159,6 +1159,66 @@ try:
         ra = llamar('GET', '/tablero', acc_admin)
         chk('ADMIN y OPERATIVO reciben las mismas cifras', ra.status_code == 200 and ra.json()['hoy'] == h and ra.json()['cartera'] == t['cartera'])
 
+    seccion('9j. Asistente (n8n falso: el token de solo lectura que recibe)')
+    # Requiere el backend arrancado con SILA_ASISTENTE_URL=http://127.0.0.1:5679/hook, SILA_ASISTENTE_SECRETO=secreto-prueba
+    # y SILA_ASISTENTE_BASE_URL apuntando a este mismo backend (p. ej. http://127.0.0.1:8081/api/v1). Si no, la seccion se omite.
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    recibido = []
+
+    class N8nFalso(BaseHTTPRequestHandler):
+        def log_message(self, *a): pass
+
+        def do_POST(self):
+            cuerpo = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+            recibido.append((self.headers.get('X-Sila-Secreto'), cuerpo))
+            base, tok = cuerpo['base_url'], {'Authorization': 'Bearer ' + cuerpo['token']}
+            m = cuerpo['mensaje']
+            if m == 'leer':
+                x = requests.get(base + '/catalogos/clientes?size=5', headers=tok, timeout=20)
+                out = {'estado': x.status_code, 'telefono': 'telefono' in x.text, 'documento': 'numero_documento' in x.text, 'email': '"email"' in x.text}
+            elif m == 'escribir':
+                x = requests.post(base + '/catalogos/clientes', headers={**tok, 'Idempotency-Key': 'asist-' + SUF + '-1234'}, json={'nombre': 'X'}, timeout=20)
+                out = {'estado': x.status_code}
+            elif m == 'usuarios':
+                out = {'estado': requests.get(base + '/usuarios', headers=tok, timeout=20).status_code}
+            elif m == 'margen':
+                out = {'estado': requests.get(base + '/reportes/margen', headers=tok, timeout=20).status_code}
+            elif m == 'asistente':
+                out = {'estado': requests.post(base + '/asistente/mensajes', headers={**tok, 'Idempotency-Key': 'asist-' + SUF + '-5678'},
+                                               json={'mensaje': 'hola', 'sesion_id': 'abcdefgh-1'}, timeout=20).status_code}
+            else:
+                out = {'estado': 0}
+            r = json.dumps({'respuesta': json.dumps(out)}).encode()
+            self.send_response(200); self.send_header('Content-Type', 'application/json'); self.send_header('Content-Length', str(len(r)))
+            self.end_headers(); self.wfile.write(r)
+
+    def preguntar(tok, texto, sesion='abcdefgh-1', clave=None):
+        return llamar('POST', '/asistente/mensajes', tok, {'mensaje': texto, 'sesion_id': sesion}, hdr={'Idempotency-Key': clave or secrets.token_hex(8)})
+
+    srv = ThreadingHTTPServer(('127.0.0.1', 5679), N8nFalso)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    r0 = preguntar(acc_oper, 'leer')
+    if r0.status_code == 503:
+        print('   (omitida: el backend no se arranco con SILA_ASISTENTE_URL)')
+    else:
+        chk('el asistente responde con el texto del agente', r0.status_code == 200 and json.loads(r0.json()['respuesta'])['estado'] == 200, r0.text[:300])
+        chk('n8n recibe el secreto, el usuario ligado a la sesion y un token', recibido and recibido[-1][0] == 'secreto-prueba'
+            and recibido[-1][1]['sesion_id'] == f'{U_OPER}:abcdefgh-1' and recibido[-1][1]['rol'] == 'OPERATIVO' and recibido[-1][1]['token'], str(recibido[-1:])[:200])
+        chk('el asistente consulta clientes sin telefono, documento ni correo', not any(json.loads(preguntar(acc_oper, 'leer').json()['respuesta'])[k] for k in ('telefono', 'documento', 'email')))
+        chk('el token de lectura no puede escribir (403)', json.loads(preguntar(acc_admin, 'escribir').json()['respuesta'])['estado'] == 403)
+        chk('ni siquiera siendo ADMIN lee usuarios con el asistente (403)', json.loads(preguntar(acc_admin, 'usuarios').json()['respuesta'])['estado'] == 403)
+        chk('el asistente de un OPERATIVO no ve el margen (403)', json.loads(preguntar(acc_oper, 'margen').json()['respuesta'])['estado'] == 403)
+        chk('el asistente de un ADMIN si ve el margen (200)', json.loads(preguntar(acc_admin, 'margen').json()['respuesta'])['estado'] == 200)
+        chk('el token de lectura no puede usar el asistente (403)', json.loads(preguntar(acc_oper, 'asistente').json()['respuesta'])['estado'] == 403)
+        chk('mensaje vacio -> 400', preguntar(acc_oper, '   ').status_code == 400)
+        chk('mensaje de mas de 1000 caracteres -> 400', preguntar(acc_oper, 'a' * 1001).status_code == 400)
+        chk('sesion_id invalido -> 400', preguntar(acc_oper, 'hola', sesion='../x').status_code == 400)
+        chk('sin sesion no hay asistente -> 401', llamar('POST', '/asistente/mensajes', None, {'mensaje': 'hola', 'sesion_id': 'abcdefgh-1'}, hdr={'Idempotency-Key': secrets.token_hex(8)}).status_code == 401)
+        chk('la pregunta queda en la bitacora de accesos', any(e['evento'] == 'ASISTENTE_PREGUNTA' and e['usuario'] == U_OPER
+            for e in llamar('GET', f'/auditoria/accesos?usuario={U_OPER}&evento=ASISTENTE_PREGUNTA&size=20', acc_admin).json()['items']))
+    srv.shutdown()
+
     seccion('10. Bloqueo por intentos y limite de frecuencia')
     u_blq = f't.blq.{SUF}'
     r = llamar('POST', '/usuarios', acc_admin, {'usuario': u_blq, 'nombre': 'Prueba Bloqueo', 'email': f'{u_blq}@example.com', 'rol': 'OPERATIVO', 'codigo': cod()})
