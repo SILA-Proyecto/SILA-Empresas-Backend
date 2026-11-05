@@ -8,7 +8,7 @@ public final class Claves {
     public static byte[] decodificar(String valor, String variable, int minimoBytes) {
         if (valor == null || valor.isBlank()) {
             throw new IllegalStateException("Falta la variable de entorno " + variable
-                    + ". Cargue las claves con ./arrancar.sh (lee ~/sila_llanolat/credenciales.txt).");
+                    + ". Cargue las claves con ./arrancar.sh (lee ~/sila-empresas-backend/credenciales.txt).");
         }
         byte[] bytes;
         try {

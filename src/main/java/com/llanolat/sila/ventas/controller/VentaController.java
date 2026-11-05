@@ -1,5 +1,7 @@
 package com.llanolat.sila.ventas.controller;
 
+import com.llanolat.sila.empresa.EmpresaService;
+import com.llanolat.sila.empresa.MapaModulos;
 import com.llanolat.sila.infra.Page;
 import com.llanolat.sila.ventas.dto.VentasDtos.AnularRequest;
 import com.llanolat.sila.ventas.dto.VentasDtos.CrearVentaRequest;
@@ -24,10 +26,12 @@ public class VentaController {
 
     private final VentaService service;
     private final VentaRepository repo;
+    private final EmpresaService empresa;
 
-    public VentaController(VentaService service, VentaRepository repo) {
+    public VentaController(VentaService service, VentaRepository repo, EmpresaService empresa) {
         this.service = service;
         this.repo = repo;
+        this.empresa = empresa;
     }
 
     @GetMapping
@@ -71,6 +75,7 @@ public class VentaController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
             @RequestParam(required = false) String sort) {
-        return repo.preciosAplicables(idCliente, texto, soloConStock, page, size, sort);
+        // Modulo PRECIOS_CLIENTE apagado: se cobra el precio de lista, aunque existan acuerdos guardados.
+        return repo.preciosAplicables(idCliente, texto, soloConStock, empresa.activo(MapaModulos.PRECIOS_CLIENTE), page, size, sort);
     }
 }

@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test;
 class PdfYClavesTest {
 
     private final PdfProtegido protegido = new PdfProtegido();
-    private final GeneradorPdf generador = new GeneradorPdf(Fixtures.props(1, false));
+    private final GeneradorPdf generador = new GeneradorPdf(() -> Fixtures.props(1, false).empresa());
 
     private static String texto(byte[] pdf) throws IOException {
         try (PDDocument d = Loader.loadPDF(new RandomAccessReadBuffer(pdf))) {
@@ -33,7 +33,7 @@ class PdfYClavesTest {
         }
     }
 
-    private static Detalle venta(int lineas, String estado) {
+    static Detalle venta(int lineas, String estado) {
         Comprobante c = new Comprobante("VENTA", 65L, "VENTA #65", "INGRESO", true, LocalDate.of(2026, 10, 15), new BigDecimal("1250000"),
                 7L, "CLIENTE", "Distribuidora Muñoz & Hijos — 中文", "Venta contado", "EFECTIVO", null,
                 estado, estado.equals("ANULADO") ? "Cliente devolvio todo el pedido por error de digitacion" : null, 3L, "paula.quintana");

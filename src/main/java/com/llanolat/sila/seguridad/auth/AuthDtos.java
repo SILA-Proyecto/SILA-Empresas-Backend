@@ -53,8 +53,9 @@ final class AuthDtos {
 
     record PasskeyRegistrada(Long idPasskey, String nombre) {}
 
+    /** fotoVersion: cambia cuando cambia la foto (GET /api/v1/fotos/yo); null si no tiene foto. */
     record UsuarioSesion(
-            Long idUsuario, String usuario, String nombre, String email, String rol, boolean mfaActivo) {}
+            Long idUsuario, String usuario, String nombre, String email, String rol, boolean mfaActivo, String fotoVersion) {}
 
     /**
      * estado: OK (trae access_token) | CAMBIAR_CLAVE | MFA_REQUERIDO | MFA_ENROLAR (traen

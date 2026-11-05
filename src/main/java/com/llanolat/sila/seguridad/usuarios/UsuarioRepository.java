@@ -19,7 +19,8 @@ class UsuarioRepository {
 
     private static final String COLUMNAS = """
             id_usuario, usuario, nombre, email, rol, activo, debe_cambiar_clave, mfa_activo,
-            bloqueado, bloqueado_minutos, ultimo_login, fecha_cambio_clave, fecha_creacion""";
+            bloqueado, bloqueado_minutos, ultimo_login, fecha_cambio_clave, fecha_creacion,
+            (SELECT SUBSTR(f.sha256, 1, 16) FROM vw_usuario_foto f WHERE f.id_usuario = vw_usuarios.id_usuario) foto_version""";
 
     private static final Map<String, String> ORDEN = Map.of(
             "id_usuario", "id_usuario", "usuario", "usuario", "nombre", "nombre", "email", "email",

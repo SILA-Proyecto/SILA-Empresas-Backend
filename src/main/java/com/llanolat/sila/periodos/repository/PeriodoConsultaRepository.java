@@ -1,5 +1,7 @@
 package com.llanolat.sila.periodos.repository;
 
+import com.llanolat.sila.empresa.EmpresaService;
+import com.llanolat.sila.empresa.MapaModulos;
 import com.llanolat.sila.infra.ConsultaPaginada;
 import com.llanolat.sila.infra.ConsultaPaginada.Filtro;
 import com.llanolat.sila.infra.Fechas;
@@ -16,6 +18,8 @@ import org.springframework.stereotype.Repository;
 /**
  * LECTURA de periodos: une vw_estado_periodos (fechas y estado) con
  * vw_resultado_periodo (cifras). El calculo del resultado lo hace la vista.
+ * Con el modulo RESULTADO_QUINCENA apagado, cada quincena sale sin el bloque del resultado ({@link PeriodoDto#sinResultado()})
+ * y no se puede ordenar por resultado_estimado (403 / 20020), para que el orden no lo revele.
  */
 @Repository
 public class PeriodoConsultaRepository {
@@ -39,10 +43,20 @@ public class PeriodoConsultaRepository {
 
     private final ConsultaPaginada paginada;
     private final JdbcClient jdbc;
+    private final EmpresaService empresa;
 
-    public PeriodoConsultaRepository(ConsultaPaginada paginada, JdbcClient jdbc) {
+    public PeriodoConsultaRepository(ConsultaPaginada paginada, JdbcClient jdbc, EmpresaService empresa) {
         this.paginada = paginada;
         this.jdbc = jdbc;
+        this.empresa = empresa;
+    }
+
+    private boolean conResultado() {
+        return empresa.activo(MapaModulos.RESULTADO_QUINCENA);
+    }
+
+    private PeriodoDto filtrar(PeriodoDto p) {
+        return conResultado() ? p : p.sinResultado();
     }
 
     public Page<PeriodoDto> periodos(Integer anio, String estado, Integer page, Integer size, String sort) {
@@ -57,13 +71,17 @@ public class PeriodoConsultaRepository {
             }
             f.cuando("e.estado = :estado").param("estado", e);
         }
+        if (sort != null && sort.trim().toLowerCase().startsWith("resultado_estimado")) {
+            empresa.exigir(MapaModulos.RESULTADO_QUINCENA);
+        }
         Paginacion pag = Paginacion.de(page, size, sort, ORDEN, "fecha_inicio,asc", "e.id_periodo");
-        return paginada.consultar(COLUMNAS, VISTA, f, pag, PeriodoDto.class);
+        Page<PeriodoDto> r = paginada.consultar(COLUMNAS, VISTA, f, pag, PeriodoDto.class);
+        return conResultado() ? r : new Page<>(r.items().stream().map(PeriodoDto::sinResultado).toList(), r.total(), r.page(), r.size());
     }
 
     public Optional<PeriodoDto> periodo(long id) {
         return jdbc.sql("SELECT " + COLUMNAS + " FROM " + VISTA + " WHERE e.id_periodo = :id")
-                   .param("id", id).query(PeriodoDto.class).optional();
+                   .param("id", id).query(PeriodoDto.class).optional().map(this::filtrar);
     }
 
     /** La quincena que contiene el dia de hoy en Colombia (la base esta en UTC), si existe. */
@@ -71,7 +89,7 @@ public class PeriodoConsultaRepository {
         return jdbc.sql("SELECT " + COLUMNAS + " FROM " + VISTA
                       + " WHERE :hoy BETWEEN e.fecha_inicio AND e.fecha_fin")
                    .param("hoy", Fechas.hoy())
-                   .query(PeriodoDto.class).optional();
+                   .query(PeriodoDto.class).optional().map(this::filtrar);
     }
 
     /** Anios que ya tienen quincenas creadas, de menor a mayor. */

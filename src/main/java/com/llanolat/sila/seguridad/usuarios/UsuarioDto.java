@@ -19,5 +19,6 @@ public record UsuarioDto(
         Integer bloqueadoMinutos,
         LocalDateTime ultimoLogin,
         LocalDateTime fechaCambioClave,
-        LocalDateTime fechaCreacion
+        LocalDateTime fechaCreacion,
+        String fotoVersion   // null si no tiene foto; la imagen: GET /api/v1/fotos/{idUsuario}
 ) {}

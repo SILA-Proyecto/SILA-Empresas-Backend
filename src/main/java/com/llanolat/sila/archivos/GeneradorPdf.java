@@ -1,5 +1,6 @@
 package com.llanolat.sila.archivos;
 
+import com.llanolat.sila.empresa.EmpresaService;
 import com.llanolat.sila.comprobantes.Comprobantes.Comprobante;
 import com.llanolat.sila.comprobantes.Comprobantes.Detalle;
 import com.llanolat.sila.comprobantes.Comprobantes.Linea;
@@ -17,8 +18,10 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.List;
+import java.util.function.Supplier;
 import java.util.Locale;
 import java.util.TimeZone;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDDocumentInformation;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -27,6 +30,7 @@ import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState;
 import org.apache.pdfbox.util.Matrix;
 import org.springframework.stereotype.Component;
@@ -45,7 +49,9 @@ public class GeneradorPdf {
     private static final PDRectangle A4 = PDRectangle.A4;
     private static final float M = 42f;                       // margen
     private static final float ANCHO = A4.getWidth() - 2 * M;
-    private static final float PIE = 54f;                     // alto reservado abajo
+    private static final float PIE = 54f;                     // alto reservado abajo (sin pie de la empresa)
+    private static final float LINEA_PIE = 10f;               // cada linea del pie de la empresa (maximo 2)
+    private static final float LADO_LOGO = 58f;
     private static final float[] AZUL = {23 / 255f, 64 / 255f, 91 / 255f};
     private static final float[] ROJO = {176 / 255f, 32 / 255f, 32 / 255f};
     private static final float[] GRIS_TEXTO = {90 / 255f, 98 / 255f, 106 / 255f};
@@ -53,9 +59,30 @@ public class GeneradorPdf {
     private static final DateTimeFormatter FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter FECHA_HORA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
-    private final ArchivosProps.Empresa empresa;
+    /** Lo que el ADMIN personaliza: texto al pie de cada pagina y logo (PNG o JPG ya recodificado). Ambos opcionales. */
+    public record Marca(String pie, byte[] logo) {}
 
-    public GeneradorPdf(ArchivosProps props) { this.empresa = props.empresa(); }
+    static final Marca SIN_MARCA = new Marca(null, null);
+
+    /** Los datos de la empresa se piden al generar cada PDF: un cambio del dueno o del ADMIN se nota sin reiniciar. */
+    private final Supplier<ArchivosProps.Empresa> datosEmpresa;
+    private final Supplier<Marca> marca;
+
+    @Autowired
+    public GeneradorPdf(EmpresaService servicio) {
+        this(() -> {
+            EmpresaService.Datos d = servicio.datos();
+            return new ArchivosProps.Empresa(d.nombre(), d.nit(), d.direccion(), d.telefono());
+        }, () -> new Marca(servicio.datos().pieComprobante(), servicio.logo().map(EmpresaService.Logo::contenido).orElse(null)));
+    }
+
+    /** Para pruebas: datos fijos. */
+    public GeneradorPdf(Supplier<ArchivosProps.Empresa> datosEmpresa) { this(datosEmpresa, () -> SIN_MARCA); }
+
+    public GeneradorPdf(Supplier<ArchivosProps.Empresa> datosEmpresa, Supplier<Marca> marca) {
+        this.datosEmpresa = datosEmpresa;
+        this.marca = marca;
+    }
 
     public byte[] generar(Detalle d, Anulacion anulacion, ZonedDateTime emision) {
         try (PDDocument doc = new PDDocument()) {
@@ -81,6 +108,13 @@ public class GeneradorPdf {
         final List<PDPage> paginas = new ArrayList<>();
         PDPageContentStream cs;
         float y;
+
+        final ArchivosProps.Empresa empresa = datosEmpresa.get();
+        final Marca personal = marca.get();
+        final List<String> lineasPie = hay(personal.pie())
+                ? envolver(limpiar(personal.pie()), normal, 8, ANCHO).stream().limit(2).toList() : List.of();
+        /** Alto reservado abajo: crece con las lineas del pie de la empresa. */
+        final float pie = PIE + lineasPie.size() * LINEA_PIE;
 
         Dibujo(PDDocument doc, Detalle d, Anulacion anulacion, ZonedDateTime emision) {
             this.doc = doc;
@@ -127,12 +161,13 @@ public class GeneradorPdf {
             cs.addRect(0, A4.getHeight() - alto, A4.getWidth(), alto);
             cs.fill();
             float[] blanco = {1, 1, 1};
-            texto(negrita, 20, M, A4.getHeight() - 34, limpiar(empresa.nombre()), blanco);
+            float x = M + logo(alto);
+            texto(negrita, 20, x, A4.getHeight() - 34, limpiar(empresa.nombre()), blanco);
             List<String> datos = new ArrayList<>();
             if (hay(empresa.nit())) datos.add("NIT " + empresa.nit());
             if (hay(empresa.direccion())) datos.add(empresa.direccion());
             if (hay(empresa.telefono())) datos.add("Tel. " + empresa.telefono());
-            if (!datos.isEmpty()) texto(normal, 8.5f, M, A4.getHeight() - 50, limpiar(String.join("   |   ", datos)), blanco);
+            if (!datos.isEmpty()) texto(normal, 8.5f, x, A4.getHeight() - 50, limpiar(String.join("   |   ", datos)), blanco);
             String etiqueta = anulacion != null ? "COMPROBANTE ANULADO" : "COMPROBANTE INTERNO";
             derecha(negrita, 9, A4.getWidth() - M, A4.getHeight() - 34, etiqueta, blanco);
             derecha(normal, 8, A4.getWidth() - M, A4.getHeight() - 48, "Documento interno. No es factura electronica.", blanco);
@@ -143,6 +178,29 @@ public class GeneradorPdf {
             texto(normal, 10, M, y, limpiar(c.numero()), GRIS_TEXTO);
             y -= 26;
             if (anulacion != null) cuadroAnulacion();
+        }
+
+        /**
+         * El logo a la izquierda de la banda, sobre un cuadro blanco (un logo oscuro no se pierde en el azul). Devuelve cuanto
+         * hay que correr el texto. Si el logo no se puede leer, el PDF sale igual, sin logo.
+         */
+        float logo(float altoBanda) throws IOException {
+            if (personal.logo() == null) return 0;
+            PDImageXObject img;
+            try {
+                img = PDImageXObject.createFromByteArray(doc, personal.logo(), "logo");
+            } catch (IOException | RuntimeException e) {
+                return 0;
+            }
+            float caja = LADO_LOGO, margen = 4;
+            float y0 = A4.getHeight() - altoBanda + (altoBanda - caja) / 2;
+            relleno(new float[] {1, 1, 1});
+            cs.addRect(M, y0, caja, caja);
+            cs.fill();
+            float f = Math.min((caja - 2 * margen) / img.getWidth(), (caja - 2 * margen) / img.getHeight());
+            float w = img.getWidth() * f, h = img.getHeight() * f;
+            cs.drawImage(img, M + (caja - w) / 2, y0 + (caja - h) / 2, w, h);
+            return caja + 12;
         }
 
         void cuadroAnulacion() throws IOException {
@@ -200,7 +258,7 @@ public class GeneradorPdf {
             for (Linea l : d.lineas()) {
                 List<String> concepto = envolver(limpiar(l.concepto()), normal, 9.5f, (conCantidad ? xCant - 70 : xValor - 60) - xConcepto);
                 float alto = Math.max(1, concepto.size()) * 13 + 8;
-                if (y - alto < PIE + 70) {
+                if (y - alto < pie + 70) {
                     nuevaPagina(false);
                     cabeceraTabla(conCantidad, xConcepto, xCant, xUnit, xValor);
                     zebra = false;
@@ -280,7 +338,7 @@ public class GeneradorPdf {
 
         /** Si no cabe lo que sigue, pasa a una pagina nueva. */
         void espacio(float necesario) throws IOException {
-            if (y - necesario < PIE) nuevaPagina(false);
+            if (y - necesario < pie) nuevaPagina(false);
         }
 
         // ---- pie, marca de agua y metadatos (ya se sabe cuantas paginas son)
@@ -290,10 +348,14 @@ public class GeneradorPdf {
             for (int i = 0; i < total; i++) {
                 try (PDPageContentStream s = new PDPageContentStream(doc, paginas.get(i), PDPageContentStream.AppendMode.APPEND, true, true)) {
                     cs = s;
-                    linea(M, PIE - 8, M + ANCHO, PIE - 8);
-                    texto(normal, 8, M, PIE - 22, limpiar("Comprobante interno generado por SILA  -  " + c.numero()
+                    linea(M, pie - 8, M + ANCHO, pie - 8);
+                    for (int k = 0; k < lineasPie.size(); k++) {
+                        texto(normal, 8, M, pie - 22 - k * LINEA_PIE, lineasPie.get(k), GRIS_TEXTO);
+                    }
+                    float yGenerado = pie - 22 - lineasPie.size() * LINEA_PIE;
+                    texto(normal, 8, M, yGenerado, limpiar("Comprobante interno generado por SILA  -  " + c.numero()
                             + "  -  " + FECHA_HORA.format(emision) + " (hora de Colombia)"), GRIS_TEXTO);
-                    derecha(normal, 8, M + ANCHO, PIE - 22, "Pagina " + (i + 1) + " de " + total, GRIS_TEXTO);
+                    derecha(normal, 8, M + ANCHO, yGenerado, "Pagina " + (i + 1) + " de " + total, GRIS_TEXTO);
                     if (anulacion != null) marcaDeAgua();
                 }
             }

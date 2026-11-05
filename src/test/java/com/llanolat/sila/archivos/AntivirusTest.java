@@ -16,7 +16,7 @@ import org.springframework.mock.env.MockEnvironment;
 class AntivirusTest {
 
     /** Lee el flujo zINSTREAM completo y responde segun el contenido. */
-    private static Thread clamdFalso(ServerSocket ss, String respuestaFija, boolean colgar) {
+    static Thread clamdFalso(ServerSocket ss, String respuestaFija, boolean colgar) {
         Thread t = Thread.startVirtualThread(() -> {
             try (Socket s = ss.accept()) {
                 if (colgar) { Thread.sleep(10_000); return; }

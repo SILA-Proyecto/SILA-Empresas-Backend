@@ -1,8 +1,13 @@
 package com.llanolat.sila.seguridad;
 
+import com.llanolat.sila.empresa.EmpresaService;
+import com.llanolat.sila.empresa.EstadoEmpresaFilter;
+import com.llanolat.sila.empresa.ModuloFilter;
 import com.llanolat.sila.infra.idempotencia.IdempotenciaFilter;
 import com.llanolat.sila.infra.idempotencia.IdempotenciaProps;
 import com.llanolat.sila.infra.idempotencia.IdempotenciaRepository;
+import com.llanolat.sila.legal.LegalPendienteFilter;
+import com.llanolat.sila.legal.LegalService;
 import jakarta.servlet.http.HttpServletResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -28,6 +33,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
+import org.springframework.web.filter.CorsFilter;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -48,14 +54,24 @@ public class SeguridadConfig {
     @Bean
     @ConditionalOnProperty(name = "sila.seguridad.modo", havingValue = "jwt")
     SecurityFilterChain cadenaJwt(HttpSecurity http, IdempotenciaRepository idempotencia,
-                                  IdempotenciaProps idempotenciaProps, JsonMapper json) throws Exception {
-        comun(http);
+                                  IdempotenciaProps idempotenciaProps, JsonMapper json, EmpresaService empresa,
+                                  LegalService legal) throws Exception {
+        comun(http, empresa);
         // El token de solo lectura del asistente: solo GET sobre rutas de negocio, sin datos personales en la respuesta.
         http.addFilterAfter(new AlcanceLecturaFilter(json), BearerTokenAuthenticationFilter.class);
+        // Quien no ha aceptado los terminos y la privacidad vigentes: 403 / 20022 en todo menos /auth, /legal y lo del login.
+        http.addFilterAfter(new LegalPendienteFilter(legal), AlcanceLecturaFilter.class);
+        // Rutas de los modulos que el dueno apago: 403 / 20020 para TODOS los tokens (tambien el del asistente).
+        http.addFilterAfter(new ModuloFilter(empresa), LegalPendienteFilter.class);
         http.addFilterAfter(new IdempotenciaFilter(idempotencia, idempotenciaProps), AuthorizationFilter.class);
         http.authorizeHttpRequests(a -> a
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers(HttpMethod.POST, AUTH + "/login", AUTH + "/refresh", AUTH + "/logout").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/empresa/publica", "/api/v1/empresa/logo").permitAll()   // pantalla de login: nombre y logo
+                .requestMatchers(HttpMethod.GET, "/api/v1/legal/vigentes").permitAll()   // version vigente de los documentos legales
+                .requestMatchers(HttpMethod.PUT, "/api/v1/empresa", "/api/v1/empresa/logo").hasRole("ADMIN")
+                .requestMatchers("/api/v1/fotos/yo").hasAuthority("TIPO_ACCESO")   // la propia: cualquiera (va antes que la de abajo)
+                .requestMatchers(HttpMethod.DELETE, "/api/v1/empresa/logo", "/api/v1/fotos/*").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, AUTH + "/mfa/verificar", AUTH + "/mfa/respaldo",
                                  AUTH + "/passkey/opciones", AUTH + "/passkey/verificar").hasAuthority("TIPO_MFA")
                 .requestMatchers(HttpMethod.POST, AUTH + "/mfa/configurar", AUTH + "/mfa/activar")
@@ -93,8 +109,8 @@ public class SeguridadConfig {
 
     @Bean
     @ConditionalOnProperty(name = "sila.seguridad.modo", havingValue = "desarrollo", matchIfMissing = true)
-    SecurityFilterChain cadenaDesarrollo(HttpSecurity http) throws Exception {
-        comun(http);
+    SecurityFilterChain cadenaDesarrollo(HttpSecurity http, EmpresaService empresa) throws Exception {
+        comun(http, empresa);
         http.authorizeHttpRequests(a -> a.anyRequest().permitAll());
         return http.build();
     }
@@ -103,14 +119,19 @@ public class SeguridadConfig {
      * login, refresh y logout viajan con cookie o credenciales, no con token. Si el cliente les manda
      * un Authorization vencido, el filtro Bearer lo rechazaria con 401 antes de llegar al controlador
      * (y la renovacion fallaria justo cuando el acceso caduco): en esas rutas se ignora la cabecera.
+     * El logo solo es publico al LEERLO: subirlo y quitarlo (PUT/DELETE, misma ruta) siguen exigiendo el token del ADMIN.
      */
     private static BearerTokenResolver resolverSinRutasPublicas() {
         DefaultBearerTokenResolver normal = new DefaultBearerTokenResolver();
-        Set<String> publicas = Set.of(AUTH + "/login", AUTH + "/refresh", AUTH + "/logout");
-        return req -> publicas.contains(req.getRequestURI()) ? null : normal.resolve(req);
+        Set<String> publicas = Set.of(AUTH + "/login", AUTH + "/refresh", AUTH + "/logout", "/api/v1/empresa/publica",
+                "/api/v1/legal/vigentes");
+        return req -> publicas.contains(req.getRequestURI())
+                || ("GET".equals(req.getMethod()) && "/api/v1/empresa/logo".equals(req.getRequestURI())) ? null : normal.resolve(req);
     }
 
-    private void comun(HttpSecurity http) throws Exception {
+    private void comun(HttpSecurity http, EmpresaService empresa) throws Exception {
+        // Empresa suspendida por el dueno: 403 / 20021 a todo salvo nombre y logo del login (en los dos modos).
+        http.addFilterAfter(new EstadoEmpresaFilter(empresa), CorsFilter.class);
         http.csrf(c -> c.disable())
             .cors(Customizer.withDefaults())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

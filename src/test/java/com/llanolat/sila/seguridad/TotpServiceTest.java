@@ -56,7 +56,7 @@ class TotpServiceTest {
 
     @Test
     void elUriOtpauthLlevaSecretoEmisorYParametros() {
-        String uri = totp.uri("kevin.mijares", SECRETO);
+        String uri = totp.uri("kevin.mijares", SECRETO, "SILA Llanolat");
         assertThat(uri).startsWith("otpauth://totp/SILA%20Llanolat:kevin.mijares?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ")
                        .contains("issuer=SILA%20Llanolat").contains("digits=6").contains("period=30");
     }

@@ -86,9 +86,12 @@ public class TotpService {
         return sb.toString();
     }
 
-    /** URI otpauth:// que el dashboard convierte en codigo QR. */
-    public String uri(String usuario, byte[] secreto) {
-        String emisor = "SILA Llanolat";
+    /**
+     * URI otpauth:// que el dashboard convierte en codigo QR. {@code emisor} ("SILA <nombre corto de la empresa>") es solo
+     * la etiqueta que muestra la app autenticadora: no entra en el calculo del codigo, asi que cambiarlo NO invalida los
+     * segundos factores ya activados (solo cambia el rotulo en los QR nuevos).
+     */
+    public String uri(String usuario, byte[] secreto, String emisor) {
         return "otpauth://totp/" + enc(emisor) + ":" + enc(usuario)
              + "?secret=" + aBase32(secreto) + "&issuer=" + enc(emisor)
              + "&algorithm=SHA1&digits=" + DIGITOS + "&period=" + PASO_SEGUNDOS;

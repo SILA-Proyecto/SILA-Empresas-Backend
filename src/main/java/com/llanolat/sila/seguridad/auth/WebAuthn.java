@@ -1,5 +1,6 @@
 package com.llanolat.sila.seguridad.auth;
 
+import com.llanolat.sila.empresa.EmpresaService;
 import com.llanolat.sila.infra.SilaException;
 import com.yubico.webauthn.AssertionRequest;
 import com.yubico.webauthn.AssertionResult;
@@ -50,10 +51,12 @@ class WebAuthn {
 
     private final PasskeyRepository repo;
     private final List<String> origenes;
+    private final EmpresaService empresa;
     private final Map<String, RelyingParty> partes = new ConcurrentHashMap<>();
     private final Map<String, Pendiente> pendientes = new ConcurrentHashMap<>();
 
-    WebAuthn(PasskeyRepository repo, @Value("${sila.cors.origenes:http://localhost:4200}") String[] origenes) {
+    WebAuthn(PasskeyRepository repo, EmpresaService empresa, @Value("${sila.cors.origenes:http://localhost:4200}") String[] origenes) {
+        this.empresa = empresa;
         this.repo = repo;
         this.origenes = Arrays.stream(origenes).map(String::trim).filter(o -> !o.isEmpty()).toList();
     }
@@ -134,10 +137,13 @@ class WebAuthn {
         if (origen == null || !origenes.contains(origen)) {
             throw SilaException.de(SilaException.PERMISO_DENEGADO, "Origen no permitido para Face ID / huella.");
         }
-        return partes.computeIfAbsent(origen, o -> RelyingParty.builder()
-                .identity(RelyingPartyIdentity.builder().id(URI.create(o).getHost()).name("SILA Llanolat").build())
+        // El nombre (lo que muestra el navegador al registrar la passkey) sale de los datos de la empresa; va en la clave
+        // de la cache para que un cambio de nombre se note sin reiniciar. El RP ID sigue siendo el host del origen.
+        String nombre = "SILA " + empresa.datos().nombreCorto();
+        return partes.computeIfAbsent(origen + "|" + nombre, k -> RelyingParty.builder()
+                .identity(RelyingPartyIdentity.builder().id(URI.create(origen).getHost()).name(nombre).build())
                 .credentialRepository(repo)
-                .origins(Set.of(o))
+                .origins(Set.of(origen))
                 .build());
     }
 

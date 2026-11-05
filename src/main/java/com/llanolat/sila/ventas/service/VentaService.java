@@ -1,5 +1,7 @@
 package com.llanolat.sila.ventas.service;
 
+import com.llanolat.sila.empresa.EmpresaService;
+import com.llanolat.sila.empresa.MapaModulos;
 import com.llanolat.sila.infra.SilaException;
 import com.llanolat.sila.ventas.dto.VentasDtos.CrearVentaRequest;
 import com.llanolat.sila.ventas.dto.VentasDtos.FijarPrecioRequest;
@@ -23,13 +25,18 @@ public class VentaService {
 
     private final com.llanolat.sila.archivos.ComprobanteArchivos archivos;
 
-    public VentaService(VentaRepository repo, com.llanolat.sila.archivos.ComprobanteArchivos archivos) {
+    private final EmpresaService empresa;
+
+    public VentaService(VentaRepository repo, com.llanolat.sila.archivos.ComprobanteArchivos archivos, EmpresaService empresa) {
         this.repo = repo;
         this.archivos = archivos;
+        this.empresa = empresa;
     }
 
     public VentaDetalle registrar(CrearVentaRequest r) {
         boolean contado = "CONTADO".equals(r.tipoVenta());
+        // Sin el modulo CREDITO solo hay ventas de contado (la base tambien se niega: pkg_ventas).
+        if (!contado) empresa.exigir(MapaModulos.CREDITO);
         List<PagoRequest> pagos = r.pagos() == null ? List.of() : r.pagos();
         if (contado && pagos.isEmpty()) {
             throw SilaException.parametroInvalido("Una venta de contado necesita al menos un pago.", "pagos");

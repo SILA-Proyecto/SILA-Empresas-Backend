@@ -8,7 +8,8 @@ import java.util.regex.Pattern;
  * Un error devuelto por la base de datos, ya interpretado.
  *
  * La base distingue dos cosas:
- *  - 20001..20012: error de negocio. El mensaje es limpio y se le puede
+ *  - 20001..20012 y 20020..20023: error de negocio. (20020 MODULO_INACTIVO y 20021 EMPRESA_SUSPENDIDA los lanzan el backend y la base;
+ *    20022 y 20023, el backend.) El mensaje es limpio y se le puede
  *    mostrar al usuario final tal cual.
  *  - 20999: fallo inesperado. El mensaje solo trae una referencia; el detalle
  *    (traza incluida) quedo en la tabla log_errores. NO mostrar al usuario.
@@ -35,6 +36,10 @@ public class SilaException extends RuntimeException {
     public static final int IDEMPOTENCIA_DISTINTA  = 20017;  // misma clave con otro contenido -> 422
     public static final int ARCHIVO_RECHAZADO      = 20018;  // el contenido de un archivo subido no se admite -> 422
     public static final int SERVICIO_NO_DISPONIBLE = 20019;  // antivirus o Drive no responden / no estan conectados -> 503
+    public static final int MODULO_INACTIVO        = 20020;  // funcion de un modulo que el dueno apago para esta empresa -> 403
+    public static final int EMPRESA_SUSPENDIDA     = 20021;  // el dueno suspendio la empresa (backend y base: pkg_seguridad) -> 403
+    public static final int LEGAL_PENDIENTE        = 20022;  // la persona no ha aceptado los terminos y la privacidad vigentes -> 403
+    public static final int VERSION_LEGAL_DESACTUALIZADA = 20023;  // acepto una version que ya no es la vigente -> 409
     public static final int ERROR_INTERNO          = 20999;
 
     /** "ORA-20003: La venta excede el cupo..." -> deja solo el texto. */

@@ -43,4 +43,13 @@ public record PeriodoDto(
         BigDecimal porPagarProveedores,
         BigDecimal pagosProveedoresCaja,
         BigDecimal cajaNeta
-) {}
+) {
+    /** Modulo RESULTADO_QUINCENA apagado: la quincena sin el bloque del resultado ni la caja neta (las cuentas siguen). */
+    public PeriodoDto sinResultado() {
+        return new PeriodoDto(idPeriodo, anio, mes, quincena, fechaInicio, fechaFin, estado,
+                null, null, null, null, null,
+                ivaVentas, totalVendido, ventasContado, ventasCredito, cobradoContado, cobradoAbonos, totalCobrado,
+                carteraPendiente, lecheLitros, lecheLitrosRechazados, lecheComprada, comprasMateriasPrimas, comprasContado,
+                comprasCredito, pagadoProveedores, porPagarProveedores, pagosProveedoresCaja, null);
+    }
+}

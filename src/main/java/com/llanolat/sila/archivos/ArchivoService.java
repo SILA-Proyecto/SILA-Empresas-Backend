@@ -12,6 +12,8 @@ import com.llanolat.sila.archivos.CifradoDocs.ArchivoIlegibleException;
 import com.llanolat.sila.archivos.CifradoDocs.Descifrado;
 import com.llanolat.sila.archivos.ValidadorSubida.ArchivoRechazadoException;
 import com.llanolat.sila.archivos.ValidadorSubida.Validado;
+import com.llanolat.sila.empresa.EmpresaService;
+import com.llanolat.sila.empresa.MapaModulos;
 import com.llanolat.sila.infra.Identidad;
 import com.llanolat.sila.infra.Page;
 import com.llanolat.sila.infra.SilaException;
@@ -45,9 +47,11 @@ public class ArchivoService {
     private final Antivirus antivirus;
     private final PdfProtegido protegido;
     private final ObjectProvider<Identidad> identidad;
+    private final EmpresaService empresa;
 
     public ArchivoService(ArchivoRepository repo, CifradoDocs cifrado, AlmacenArchivos almacen, ValidadorSubida validador,
-                          Antivirus antivirus, PdfProtegido protegido, ObjectProvider<Identidad> identidad) {
+                          Antivirus antivirus, PdfProtegido protegido, ObjectProvider<Identidad> identidad, EmpresaService empresa) {
+        this.empresa = empresa;
         this.repo = repo;
         this.cifrado = cifrado;
         this.almacen = almacen;
@@ -71,6 +75,8 @@ public class ArchivoService {
 
     /** El OPERATIVO solo ve los comprobantes que genera la aplicacion; lo que sube el ADMIN es del ADMIN. */
     private boolean visible(String origen) {
+        // Lo que sube el ADMIN pertenece al modulo ARCHIVOS; los PDF de comprobantes (origen COMPROBANTE) son del nucleo.
+        if (!"COMPROBANTE".equals(origen)) empresa.exigir(MapaModulos.ARCHIVOS);
         return esAdmin() || "COMPROBANTE".equals(origen);
     }
 

@@ -26,7 +26,10 @@ public record ArchivosProps(
         @DefaultValue Drive drive
 ) {
 
-    /** Encabezado de los PDF. Solo el nombre es obligatorio. */
+    /**
+     * Encabezado de los PDF. YA NO se configura por variables (SILA_EMPRESA_*): la fuente es la tabla `empresa`
+     * (EmpresaService). Este tipo solo transporta los datos hasta el generador de PDF.
+     */
     public record Empresa(@DefaultValue("LLANOLAT") String nombre, String nit, String direccion, String telefono) {}
 
     /**

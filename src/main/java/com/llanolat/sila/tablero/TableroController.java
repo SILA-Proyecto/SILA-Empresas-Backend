@@ -1,5 +1,7 @@
 package com.llanolat.sila.tablero;
 
+import com.llanolat.sila.empresa.EmpresaService;
+import com.llanolat.sila.empresa.MapaModulos;
 import com.llanolat.sila.infra.Fechas;
 import com.llanolat.sila.notificaciones.NotificacionController.Notificacion;
 import com.llanolat.sila.tablero.Tablero.Alertas;
@@ -29,8 +31,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class TableroController {
 
     private final JdbcClient jdbc;
+    private final EmpresaService empresa;
 
-    public TableroController(JdbcClient jdbc) { this.jdbc = jdbc; }
+    public TableroController(JdbcClient jdbc, EmpresaService empresa) {
+        this.jdbc = jdbc;
+        this.empresa = empresa;
+    }
 
     @GetMapping
     public Respuesta tablero() {
@@ -97,12 +103,16 @@ public class TableroController {
                  ORDER BY d.fecha""")
                 .param("desde", hoy.minusDays(6)).query(VentaDia.class).list();
 
+        // Modulo CREDITO apagado: sin bloque de cartera ni ventas a credito (null). Las alertas de mora ya no vienen de la vista.
+        boolean credito = empresa.activo(MapaModulos.CREDITO);
+        // Modulo RESULTADO_QUINCENA apagado: la quincena sin el bloque del resultado (igual que /periodos)
+        if (quincena != null && !empresa.activo(MapaModulos.RESULTADO_QUINCENA)) quincena = quincena.sinResultado();
         return new Respuesta(hoy,
-                new Hoy(i.ventasTotal(), i.ventasCantidad(), i.ventasContado(), i.ventasCredito(),
+                new Hoy(i.ventasTotal(), i.ventasCantidad(), i.ventasContado(), credito ? i.ventasCredito() : null,
                         i.cajaIngresos(), i.cajaEgresos(), i.cajaIngresos().subtract(i.cajaEgresos()),
                         i.litrosRecibidos(), i.litrosRechazados(), i.lotesProducidos()),
                 quincena,
-                new Cartera(i.carteraSaldo(), i.carteraVencido(), i.clientesConSaldo(), i.clientesEnMora()),
+                credito ? new Cartera(i.carteraSaldo(), i.carteraVencido(), i.clientesConSaldo(), i.clientesEnMora()) : null,
                 new Inventario(i.valorProductos(), i.productosBajoMinimo(), i.productosAgotados(),
                         i.valorInsumos(), i.insumosBajoMinimo(), i.lotesPorVencer()),
                 new Proveedores(i.proveedoresSaldo(), i.proveedoresConSaldo()),

@@ -30,7 +30,10 @@ public class SilaExceptionHandler {
             case SilaException.PARAMETRO_INVALIDO,
                  SilaException.ABONO_INVALIDO            -> HttpStatus.BAD_REQUEST;   // 400
             case SilaException.AUTENTICACION             -> HttpStatus.UNAUTHORIZED;  // 401
-            case SilaException.PERMISO_DENEGADO          -> HttpStatus.FORBIDDEN;     // 403
+            case SilaException.PERMISO_DENEGADO,
+                 SilaException.MODULO_INACTIVO,
+                 SilaException.EMPRESA_SUSPENDIDA,
+                 SilaException.LEGAL_PENDIENTE           -> HttpStatus.FORBIDDEN;     // 403
             case SilaException.CUENTA_BLOQUEADA          -> HttpStatus.LOCKED;        // 423
             case SilaException.DEMASIADOS_INTENTOS       -> HttpStatus.TOO_MANY_REQUESTS; // 429
             case SilaException.ENTIDAD_NO_EXISTE         -> HttpStatus.NOT_FOUND;     // 404
@@ -43,7 +46,8 @@ public class SilaExceptionHandler {
                  SilaException.PERIODO_NO_ENCONTRADO,
                  SilaException.ESTADO_INVALIDO,
                  SilaException.REGISTRO_INMUTABLE,
-                 SilaException.FACTURACION              -> HttpStatus.CONFLICT;      // 409
+                 SilaException.FACTURACION,
+                 SilaException.VERSION_LEGAL_DESACTUALIZADA -> HttpStatus.CONFLICT;  // 409
             default                                      -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
 

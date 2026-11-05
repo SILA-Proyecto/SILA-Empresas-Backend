@@ -23,7 +23,13 @@ public final class Tablero {
     public record Quincena(Long idPeriodo, Integer anio, Integer mes, Integer quincena, LocalDate fechaInicio, LocalDate fechaFin,
                            String estado, BigDecimal ingresosVentas, BigDecimal totalVendido, BigDecimal totalCobrado,
                            BigDecimal costoProduccion, BigDecimal gastosOperativos, BigDecimal carteraCastigada,
-                           BigDecimal resultadoEstimado, BigDecimal cajaNeta, BigDecimal lecheLitros, BigDecimal porPagarProveedores) {}
+                           BigDecimal resultadoEstimado, BigDecimal cajaNeta, BigDecimal lecheLitros, BigDecimal porPagarProveedores) {
+        /** Modulo RESULTADO_QUINCENA apagado: lo mismo que /periodos (sin el bloque del resultado ni la caja neta). */
+        public Quincena sinResultado() {
+            return new Quincena(idPeriodo, anio, mes, quincena, fechaInicio, fechaFin, estado, null, totalVendido, totalCobrado,
+                    null, null, null, null, null, lecheLitros, porPagarProveedores);
+        }
+    }
 
     public record Cartera(BigDecimal saldoTotal, BigDecimal saldoVencido, Integer clientesConSaldo, Integer clientesEnMora) {}
 

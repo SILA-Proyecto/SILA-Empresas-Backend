@@ -7,14 +7,17 @@ spring:
     property-naming-strategy: SNAKE_CASE
 
   datasource:
-    url: jdbc:oracle:thin:@localhost:1521/XEPDB1
-    username: LLANOLAT_APP
-    password: ${LLANOLAT_APP_PWD}
+    # Por defecto, el Oracle local. En la nube: SILA_DB_URL=jdbc:oracle:thin:@<servicio>?TNS_ADMIN=<carpeta del wallet> (la pone arrancar.sh
+    # desde empresas/<ESQUEMA>/instancia.env; ver sql/LEEME.md, seccion Nube).
+    url: ${SILA_DB_URL:jdbc:oracle:thin:@localhost:1521/XEPDB1}
+    # Cuenta, clave y esquema salen de variables (./arrancar.sh las carga de credenciales.txt); sin valor por defecto.
+    username: ${SILA_DB_USUARIO}
+    password: ${SILA_DB_CLAVE}
     driver-class-name: oracle.jdbc.OracleDriver
     hikari:
-      # LLANOLAT_APP no es dueno de nada: esto solo resuelve los nombres de
+      # La cuenta de la aplicacion no es duena de nada: esto solo resuelve los nombres de
       # los packages y vistas. No otorga ningun privilegio.
-      connection-init-sql: ALTER SESSION SET CURRENT_SCHEMA = LLANOLAT
+      connection-init-sql: ALTER SESSION SET CURRENT_SCHEMA = ${SILA_DB_ESQUEMA}
       # Los procedimientos PL/SQL hacen su propio COMMIT: no usar @Transactional.
       auto-commit: true
       maximum-pool-size: 10
@@ -46,7 +49,7 @@ server:
   shutdown: graceful
   # Solo esta maquina por defecto. Para probar desde otro equipo: SILA_BIND=0.0.0.0 (y nunca en produccion sin proxy y firewall).
   address: ${SILA_BIND:127.0.0.1}
-  port: 8080
+  port: ${SILA_PUERTO:8082}
 
 management:
   endpoints:
@@ -62,6 +65,10 @@ logging:
     com.llanolat.sila: INFO     # para ver el detalle en desarrollo: LOGGING_LEVEL_COM_LLANOLAT_SILA=DEBUG
 
 sila:
+  # Los datos de la empresa (nombre, NIT...) y sus modulos salen de la base (tablas empresa y modulos, que cambia solo el
+  # dueno con sql/empresa.sh y sql/modulos.sh). Las variables SILA_EMPRESA_* ya no existen. Cache de lectura de la app:
+  modulos:
+    cache-ttl: ${SILA_MODULOS_CACHE_TTL:30s}
   seguridad:
     # jwt        = identidad del token de acceso. ES EL MODO POR DEFECTO, tambien en desarrollo.
     # desarrollo = la identidad viene de las cabeceras X-Usuario / X-Rol: CUALQUIERA puede
@@ -79,18 +86,30 @@ sila:
     # La cookie de renovacion solo viaja por HTTPS. Chrome y Firefox la aceptan en http://localhost.
     cookie-secure: ${SILA_COOKIE_SECURE:true}
     mfa-obligatorio-roles: ADMIN
+  legal:
+    # Version VIGENTE de cada documento legal (el texto vive en el dashboard; aqui solo cual rige). Quien no haya aceptado ESTA
+    # version de los DOS recibe 403 / 20022 en toda la API salvo /auth, /legal y lo del login. Cambiar la version (y reiniciar)
+    # obliga a todos a aceptar de nuevo. Por empresa: SILA_LEGAL_* en empresas/<ESQUEMA>/instancia.env (arrancar.sh las pasa).
+    documentos:
+      terminos:
+        version: ${SILA_LEGAL_TERMINOS_VERSION:1.0}
+        fecha: ${SILA_LEGAL_TERMINOS_FECHA:2026-10-28}
+      privacidad:
+        version: ${SILA_LEGAL_PRIVACIDAD_VERSION:1.0}
+        fecha: ${SILA_LEGAL_PRIVACIDAD_FECHA:2026-10-28}
+    cache-ttl: ${SILA_LEGAL_CACHE_TTL:30s}
   asistente:
     # Chat de ayuda (flujos de n8n en esta misma maquina). Sin url = apagado. n8n no se expone a internet.
     url: ${SILA_ASISTENTE_URL:}
     secreto: ${SILA_ASISTENTE_SECRETO:}
     # Direccion del API vista DESDE n8n (si n8n corre en Docker, la del anfitrion).
-    base-url: ${SILA_ASISTENTE_BASE_URL:http://127.0.0.1:8080/api/v1}
+    base-url: ${SILA_ASISTENTE_BASE_URL:http://127.0.0.1:8082/api/v1}
     token-ttl: 5m
     timeout: 60s
     limite-por-hora: 30
   cors:
-    # Origenes permitidos (separados por coma). ng serve usa :4200.
-    origenes: http://localhost:4200
+    # Origenes permitidos (separados por coma). El dashboard de empresas usa http://127.0.0.1:4300 (no localhost: la cookie sila_refresh no distingue puertos; el de Llanolat es localhost:4200).
+    origenes: http://127.0.0.1:4300
   archivos:
     # Archivos CIFRADOS (comprobantes en PDF y lo que sube el ADMIN). Fuera de cualquier carpeta que sirva un servidor web.
     directorio: ${SILA_DOCS_DIR:${user.home}/sila_docs}
@@ -99,11 +118,6 @@ sila:
     docs-key: ${SILA_DOCS_KEY:}
     # Los movimientos de esta fecha en adelante reciben PDF si les falta (reintento automatico). Vacio = apagado.
     fecha-corte: ${SILA_DOCS_FECHA_CORTE:}
-    empresa:
-      nombre: ${SILA_EMPRESA_NOMBRE:LLANOLAT}
-      nit: ${SILA_EMPRESA_NIT:}
-      direccion: ${SILA_EMPRESA_DIRECCION:}
-      telefono: ${SILA_EMPRESA_TELEFONO:}
     clamav:
       # Antivirus ClamAV (clamd). Habilitado = la subida se rechaza si clamd no responde. Apagarlo SOLO en desarrollo.
       habilitado: ${SILA_CLAMAV:true}

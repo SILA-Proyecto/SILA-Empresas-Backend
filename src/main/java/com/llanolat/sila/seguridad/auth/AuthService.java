@@ -1,5 +1,7 @@
 package com.llanolat.sila.seguridad.auth;
 
+import com.llanolat.sila.empresa.EmpresaService;
+import com.llanolat.sila.fotos.FotoRepository;
 import com.llanolat.sila.infra.SilaException;
 import com.llanolat.sila.seguridad.AccesoRegistrador;
 import com.llanolat.sila.seguridad.CifradoMfa;
@@ -67,11 +69,14 @@ class AuthService {
     private final VerificadorUsuario verificador;
     private final PasskeyRepository passkeys;
     private final WebAuthn webauthn;
+    private final EmpresaService empresa;
+    private final FotoRepository fotos;
     private final SecureRandom azar = new SecureRandom();
 
     AuthService(AuthRepository repo, PasswordService passwords, TokenService tokens, TotpService totp,
                 CifradoMfa cifrado, LimiteTasa limite, SeguridadProps props, AccesoRegistrador acceso,
-                VerificadorUsuario verificador, PasskeyRepository passkeys, WebAuthn webauthn) {
+                VerificadorUsuario verificador, PasskeyRepository passkeys, WebAuthn webauthn, EmpresaService empresa,
+                FotoRepository fotos) {
         this.repo = repo;
         this.passwords = passwords;
         this.tokens = tokens;
@@ -83,6 +88,8 @@ class AuthService {
         this.verificador = verificador;
         this.passkeys = passkeys;
         this.webauthn = webauthn;
+        this.empresa = empresa;
+        this.fotos = fotos;
     }
 
     // ---------- login ----------
@@ -170,7 +177,7 @@ class AuthService {
         }
         byte[] secreto = totp.nuevoSecreto();
         repo.mfaGuardarSecreto(cred.idUsuario(), cifrado.cifrar(secreto, cred.idUsuario()));
-        return new MfaConfig(totp.aBase32(secreto), totp.uri(cred.usuario(), secreto));
+        return new MfaConfig(totp.aBase32(secreto), totp.uri(cred.usuario(), secreto, "SILA " + empresa.datos().nombreCorto()));
     }
 
     /** Al activar el segundo factor se entregan, UNA sola vez, los codigos de respaldo. */
@@ -453,8 +460,9 @@ class AuthService {
         return new AuthResponse("OK", token, tokens.segundosAcceso(), null, sesionDe(cred), null, null, null);
     }
 
-    private static UsuarioSesion sesionDe(Credencial c) {
-        return new UsuarioSesion(c.idUsuario(), c.usuario(), c.nombre(), c.email(), c.rol(), c.mfaActivo());
+    private UsuarioSesion sesionDe(Credencial c) {
+        return new UsuarioSesion(c.idUsuario(), c.usuario(), c.nombre(), c.email(), c.rol(), c.mfaActivo(),
+                                 fotos.version(c.idUsuario()).orElse(null));
     }
 
     private List<String> generarCodigosRespaldo(long idUsuario) {

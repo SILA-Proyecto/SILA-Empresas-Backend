@@ -146,7 +146,7 @@ public class VentaRepository {
     }
 
     /** Productos activos con el precio que se le cobraria a ESTE cliente (pactado o de lista). Para el punto de venta. */
-    public Page<PrecioAplicable> preciosAplicables(long idCliente, String texto, boolean soloConStock,
+    public Page<PrecioAplicable> preciosAplicables(long idCliente, String texto, boolean soloConStock, boolean conPactados,
                                                    Integer page, Integer size, String sort) {
         Filtro f = new Filtro().cuando("p.activo = 1").param("idCliente", idCliente);
         if (texto != null && !texto.isBlank()) {
@@ -158,7 +158,9 @@ public class VentaRepository {
         return paginada.consultar("""
                 p.id_producto, p.codigo_sku, p.nombre AS producto, p.unidad_medida, p.tarifa_iva, p.stock_actual,
                 p.precio_base, pc.precio AS precio_pactado, NVL(pc.precio, p.precio_base) AS precio_aplicable""",
-                "vw_productos p LEFT JOIN vw_precios_cliente pc ON pc.id_producto = p.id_producto AND pc.id_cliente = :idCliente AND pc.activo = 1",
+                // Sin el modulo PRECIOS_CLIENTE el join no encuentra nada (1 = 0): precio_pactado queda nulo.
+                "vw_productos p LEFT JOIN vw_precios_cliente pc ON pc.id_producto = p.id_producto AND pc.id_cliente = :idCliente AND pc.activo = 1"
+                        + (conPactados ? "" : " AND 1 = 0"),
                 f, pag, PrecioAplicable.class);
     }
 
