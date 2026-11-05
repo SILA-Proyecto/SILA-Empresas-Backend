@@ -35,3 +35,15 @@ build/
 ### SILA: solo local ###
 ESTADO.md
 pruebas/__pycache__/
+
+### SILA Empresas: solo local ###
+credenciales.txt
+sql/salida/
+*.log
+empresas/
+
+### Material local que no se publica (no forma parte del funcionamiento) ###
+docs/
+pruebas/
+ESTADO_EMPRESAS.md
+PROMPT_1_BACKEND_DB_ARRANQUE.md
